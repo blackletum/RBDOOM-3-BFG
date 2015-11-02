@@ -28,6 +28,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
+#include <lua.hpp>
+
 idSWFScriptObject_SpriteInstancePrototype spriteInstanceScriptObjectPrototype;
 
 /*
@@ -312,6 +314,7 @@ bool idSWFSpriteInstance::RunActions()
 	if( !isVisible )
 	{
 		actions.SetNum( 0 );
+		luaActions.SetNum( 0 );
 		return false;
 	}
 
@@ -334,6 +337,51 @@ bool idSWFSpriteInstance::RunActions()
 	}
 	actions.SetNum( 0 );
 
+	// RB begin
+#if 1
+	lua_State* L = sprite->GetSWF()->GetLuaState();
+	for( int i = 0; i < luaActions.Num(); i++ )
+	{
+		const char* name = ( const char* ) luaActions[i].data;
+		
+		//lua_getfield( L, -1, name ); // ... userdata ( function | nil )
+		
+		lua_getglobal( L, name ); // ... ( function | nil )
+		
+		if( lua_isfunction( L, -1 ) )
+		{
+			// push self reference
+			//luaW_push<idWindow>( luaState, desktop );	// ... userdata function userdata
+			
+			//lua_printstack( L );
+			
+			if( lua_pcall( L, 1, 0, NULL ) != 0 ) // ... userdata
+			{
+				idLib::Warning( "idSWFSpriteInstance::RunActions( %s ): error running function: %s\n", name, lua_tostring( L, -1 ) );
+			}
+			else
+			{
+				//lua_pop( L, 1 ); // ...
+			}
+			
+			lua_printstack( L );
+		}
+		else
+		{
+			// ... nil
+			lua_pop( L, 1 ); // ...
+		}
+		
+		lua_printstack( L );
+		
+		
+		//actionScript->SetData( luaActions[i].data, luaActions[i].dataLength );
+		//actionScript->Call( scriptObject, idSWFParmList() );
+	}
+	luaActions.SetNum( 0 );
+#endif
+	// RB end
+	
 	for( int i = 0; i < displayList.Num(); i++ )
 	{
 		if( displayList[i].spriteInstance != NULL )
@@ -434,7 +482,7 @@ void idSWFSpriteInstance::RunTo( int targetFrame )
 	for( uint32 c = sprite->frameOffsets[ currentFrame ]; c < sprite->frameOffsets[ targetFrame ]; c++ )
 	{
 		idSWFSprite::swfSpriteCommand_t& command = sprite->commands[ c ];
-		if( command.tag == Tag_DoAction && c < firstActionCommand )
+		if( ( command.tag == Tag_DoAction || command.tag == Tag_DoLua ) && c < firstActionCommand )
 		{
 			// Skip DoAction up to the firstActionCommand
 			// This is to properly support skipping to a specific frame
@@ -452,6 +500,7 @@ void idSWFSpriteInstance::RunTo( int targetFrame )
 				HANDLE_SWF_TAG( RemoveObject2 );
 				HANDLE_SWF_TAG( StartSound );
 				HANDLE_SWF_TAG( DoAction );
+				HANDLE_SWF_TAG( DoLua );
 #undef HANDLE_SWF_TAG
 			default:
 				idLib::Printf( "Run Sprite: Unhandled tag %s\n", idSWF::GetTagName( command.tag ) );
@@ -474,6 +523,15 @@ void idSWFSpriteInstance::DoAction( idSWFBitStream& bitstream )
 	action.dataLength = bitstream.Length();
 #endif
 }
+
+// RB begin
+void idSWFSpriteInstance::DoLua( idSWFBitStream& bitstream )
+{
+	swfAction_t& action = luaActions.Alloc();
+	action.data = bitstream.ReadData( bitstream.Length() );
+	action.dataLength = bitstream.Length();
+}
+// RB end
 
 /*
 ========================
