@@ -3,6 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
+Copyright (C) 2023 Harrie van Ginneken
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -31,9 +32,9 @@ If you have questions concerning this license or the applicable additional terms
 
 #pragma warning( disable: 4189 ) // local variable is initialized but not referenced
 
+// HarrievG begin
 void idSWFShapeParser::MakeCap( idSWFShapeParser::swfSPDrawLine_t& spld, idSWFShapeDrawLine& ld, swfSPMorphEdge_t& edge, bool end )
 {
-
 	//figure out what the orientation of the cap is.
 
 	idVec2 up = ( verts[edge.start.v0] - verts[edge.start.v1] );
@@ -246,6 +247,7 @@ void idSWFShapeParser::Parse( idSWFBitStream& bitstream, idSWFShape& shape, int 
 		}
 	}
 }
+// HarrievG end
 
 /*
 ========================

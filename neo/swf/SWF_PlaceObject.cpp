@@ -147,6 +147,13 @@ void idSWFSpriteInstance::PlaceObject3( idSWFBitStream& bitstream )
 	uint64 flags2 = bitstream.ReadU8();
 	uint16 depth = bitstream.ReadU16();
 
+	/* RB: TODO REVIEW - it has been removed compared to BFG edition
+	if( ( flags2 & PlaceFlagHasClassName ) != 0 || ( ( ( flags2 & PlaceFlagHasImage ) != 0 ) && ( ( flags1 & PlaceFlagHasCharacter ) != 0 ) ) )
+	{
+		bitstream.ReadString(); // ignored
+	}
+	*/
+
 	int characterID = -1;
 	if( ( flags1 & PlaceFlagHasCharacter ) != 0 )
 	{

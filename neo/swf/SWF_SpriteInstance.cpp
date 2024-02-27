@@ -3,6 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
+Copyright (C) 2023 Harrie van Ginneken
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -133,11 +134,11 @@ void idSWFSpriteInstance::FreeDisplayList()
 {
 	for( int i = 0; i < displayList.Num(); i++ )
 	{
-
 		if( displayList[i].spriteInstance )
 		{
 			sprite->swf->spriteInstanceAllocator.Free( displayList[i].spriteInstance );
 		}
+
 		if( displayList[i].textInstance )
 		{
 			sprite->swf->textInstanceAllocator.Free( displayList[i].textInstance );
@@ -1670,7 +1671,8 @@ SWF_SPRITE_NATIVE_VAR_DEFINE_GET( _name )
 	SWF_SPRITE_PTHIS_GET( "_name" );
 	return pThis->name.c_str();
 }
-//Im not sure how much of the 'legacy' underscore prefixed functions need to be changed for as3.0.
+
+// HarrievG: I'm not sure how much of the 'legacy' underscore prefixed functions need to be changed for as3.0.
 //if more is needed, we should change the macro to work for both legacy AS and 3.0
 SWF_SPRITE_NATIVE_VAR_DEFINE_GET( name )
 {
