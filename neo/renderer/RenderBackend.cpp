@@ -5,7 +5,7 @@ Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
 Copyright (C) 2014 Carl Kenner
 Copyright (C) 2016-2017 Dustin Land
-Copyright (C) 2013-2023 Robert Beckebans
+Copyright (C) 2013-2024 Robert Beckebans
 Copyright (C) 2022 Stephen Pridham
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
@@ -5386,11 +5386,12 @@ void idRenderBackend::ExecuteBackEndCommands( const emptyCommand_t* cmds )
 
 	DrawFlickerBox();
 
-	GL_EndFrame();
-
 	// stop rendering on this thread
 	uint64 backEndFinishTime = Sys_Microseconds();
 	pc.cpuTotalMicroSec = backEndFinishTime - backEndStartTime;
+
+	// SRS - capture backend timing before GL_EndFrame() since it can block when r_mvkSynchronousQueueSubmits is enabled on macOS/MoltenVK
+	GL_EndFrame();
 
 	if( r_debugRenderToTexture.GetInteger() == 1 )
 	{

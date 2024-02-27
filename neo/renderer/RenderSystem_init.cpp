@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2014-2021 Robert Beckebans
+Copyright (C) 2014-2024 Robert Beckebans
 Copyright (C) 2014-2016 Kot in Action Creative Artel
 Copyright (C) 2022 Stephen Pridham
 
@@ -2211,12 +2211,8 @@ void idRenderSystemLocal::Shutdown()
 
 	UnbindBufferObjects();
 
-	// SRS - wait for fence to hit before freeing any resources the GPU may be using, otherwise get Vulkan validation layer errors on shutdown
-	// SRS - skip this step if we are in a Doom Classic game
-	if( common->GetCurrentGame() == DOOM3_BFG )
-	{
-		backend.GL_BlockingSwapBuffers();
-	}
+	// SRS - wait for device idle before freeing any resources the GPU may be using, otherwise get errors on shutdown
+	deviceManager->GetDevice()->waitForIdle();
 
 	// free the vertex cache, which should have nothing allocated now
 	vertexCache.Shutdown();

@@ -224,12 +224,12 @@ void SortMemoryPool(MemoryPool<T, SIZE>& memoryPool)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-EventDescription* EventDescription::Create(const char* eventName, const char* fileName, const unsigned long fileLine, const unsigned long eventColor /*= Color::Null*/, const unsigned long filter /*= 0*/, const uint8_t eventFlags /*= 0*/)
+EventDescription* EventDescription::Create(const char* eventName, const char* fileName, const uint32_t fileLine, const uint32_t eventColor /*= Color::Null*/, const uint32_t filter /*= 0*/, const uint8_t eventFlags /*= 0*/)
 {
 	return EventDescriptionBoard::Get().CreateDescription(eventName, fileName, fileLine, eventColor, filter, eventFlags);
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-EventDescription* EventDescription::CreateShared(const char* eventName, const char* fileName, const unsigned long fileLine, const unsigned long eventColor /*= Color::Null*/, const unsigned long filter /*= 0*/)
+EventDescription* EventDescription::CreateShared(const char* eventName, const char* fileName, const uint32_t fileLine, const uint32_t eventColor /*= Color::Null*/, const uint32_t filter /*= 0*/)
 {
 	return EventDescriptionBoard::Get().CreateSharedDescription(eventName, fileName, fileLine, eventColor, filter);
 }
@@ -240,7 +240,7 @@ EventDescription::EventDescription() : name(""), file(""), line(0), index((uint3
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 EventDescription& EventDescription::operator=(const EventDescription&)
 {
-	OPTICK_FAILED("It is pointless to copy EventDescription. Please, check you logic!"); return *this;
+	OPTICK_VERIFY( false, "It is pointless to copy EventDescription. Please, check your logic!", return *this );
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 EventData* Event::Start(const EventDescription& description)
@@ -745,6 +745,8 @@ bool SwitchContextCollector::Serialize(OutputDataStream& stream)
 #define CPUID(INFO, ID) __cpuid(INFO, ID)
 #elif (defined(__ANDROID__) || defined(OPTICK_ARM))
 // Nothing
+#elif defined(OPTICK_E2K)
+// Nothing
 #elif defined(OPTICK_GCC)
 #include <cpuid.h>
 #define CPUID(INFO, ID) __cpuid(ID, INFO[0], INFO[1], INFO[2], INFO[3])
@@ -772,6 +774,12 @@ string GetCPUName()
 		return "ARM 32-bit";
 	#else
 		return "ARM 64-bit";
+	#endif
+#elif defined(OPTICK_E2K)
+	#if (defined(__LCC__) && defined(__MCST__)) // MCST LCC (eLbrus Compiler Collection)
+		return __builtin_cpu_name(); // e.g. elbrus-8c
+	#else
+		return "MCST Elbrus CPU";
 	#endif
 #else
 	int cpuInfo[4] = { -1 };
