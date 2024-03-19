@@ -46,11 +46,11 @@ extern "C"
 	** these libs are loaded by lua.c and are readily available to any Lua
 	** program
 	*/
-	
-	
-	
+
+
+
 	int			luaopen_sys( lua_State* L );
-	
+
 	static const luaL_Reg loadedlibs[] =
 	{
 		{"_G", luaopen_base},
@@ -66,8 +66,8 @@ extern "C"
 //		{"sys", luaopen_sys},
 		{NULL, NULL}
 	};
-	
-	
+
+
 	/*
 	** these libs are preloaded and must be required before used
 	*/
@@ -75,20 +75,20 @@ extern "C"
 	{
 		{NULL, NULL}
 	};
-	
-	
-	
+
+
+
 	LUALIB_API void luaL_openlibs( lua_State* L )
 	{
 		const luaL_Reg* lib;
-		
+
 		/* call open functions from 'loadedlibs' and set results to global table */
 		for( lib = loadedlibs; lib->func; lib++ )
 		{
 			luaL_requiref( L, lib->name, lib->func, 1 );
 			lua_pop( L, 1 ); /* remove lib */
 		}
-		
+
 		/* add open functions from 'preloadedlibs' into 'package.preload' table */
 		luaL_getsubtable( L, LUA_REGISTRYINDEX, "_PRELOAD" );
 		for( lib = preloadedlibs; lib->func; lib++ )
@@ -98,14 +98,14 @@ extern "C"
 		}
 		lua_pop( L, 1 ); /* remove _PRELOAD table */
 	}
-	
+
 }
 
 void* idSWF::LuaAlloc( void* ud, void* ptr, size_t osize, size_t nsize )
 {
 	( void )ud;
 	//( void )osize; /* not used */
-	
+
 #if 0
 	if( nsize == 0 )
 	{
@@ -125,51 +125,51 @@ void* idSWF::LuaAlloc( void* ud, void* ptr, size_t osize, size_t nsize )
 	else
 	{
 		void* mem = Mem_Alloc( nsize, TAG_LUA );
-	
+
 		if( ptr != NULL )
 		{
 			SIMDProcessor->Memcpy( mem, ptr, ( osize < nsize ) ? osize : nsize );
 			Mem_Free( ptr );
 		}
-	
+
 		return mem;
 	}
-	
+
 #endif
 }
 
 int idSWF::LuaPanic( lua_State* L )
 {
 	//lua_printstack( L );
-	
+
 	//luai_writestringerror( "PANIC: unprotected error in call to Lua API (%s)\n", lua_tostring( L, -1 ) );
 	idLib::Error( "PANIC: unprotected error in call to Lua API (%s)\n", lua_tostring( L, -1 ) );
-	
+
 	return 0;  /* return to Lua to abort */
 }
 
 int idSWF::LuaNativeScriptFunctionCall( lua_State* L )
 {
 	//lua_printstack( L );
-	
+
 	extern idCVar swf_debugInvoke;
-	
+
 	const char* function = lua_tostring( L, lua_upvalueindex( 1 ) );
-	
+
 	if( swf_debugInvoke.GetBool() )
 	{
 		idLib::Printf( "LuaNativeScriptFunctionCall( %s", function );
 	}
-	
+
 	// convert Lua parms to Flash parms
 	idSWFParmList parms;
-	
+
 	int top = lua_gettop( L );
-	
+
 	for( int i = 1; i <= top; i++ )
 	{
 		int t = lua_type( L, i );
-		
+
 		switch( t )
 		{
 			case LUA_TNUMBER:
@@ -179,7 +179,7 @@ int idSWF::LuaNativeScriptFunctionCall( lua_State* L )
 				}
 				parms.Append( ( float ) lua_tonumber( L, i ) );
 				break;
-				
+
 			case LUA_TBOOLEAN:
 				if( swf_debugInvoke.GetBool() )
 				{
@@ -187,7 +187,7 @@ int idSWF::LuaNativeScriptFunctionCall( lua_State* L )
 				}
 				parms.Append( lua_toboolean( L, i ) != 0 );
 				break;
-				
+
 			case LUA_TSTRING:
 				if( swf_debugInvoke.GetBool() )
 				{
@@ -195,7 +195,7 @@ int idSWF::LuaNativeScriptFunctionCall( lua_State* L )
 				}
 				parms.Append( lua_tostring( L, i ) );
 				break;
-				
+
 			default:
 				if( swf_debugInvoke.GetBool() )
 				{
@@ -204,55 +204,55 @@ int idSWF::LuaNativeScriptFunctionCall( lua_State* L )
 				break;
 		}
 	}
-	
+
 	if( swf_debugInvoke.GetBool() )
 	{
 		idLib::Printf( " )\n" );
 	}
-	
+
 	idSWFSprite* sprite = luaSpriteInstance->sprite;
 	idSWFScriptVar globalFunc = sprite->GetSWF()->GetGlobal( function );
 	if( globalFunc.IsFunction() )
 	{
 		idSWFScriptVar results = globalFunc.GetFunction()->Call( NULL, parms );
-		
+
 		// TODO if results > 1 push to stack
 	}
-	
+
 	return 0;
 }
 
 void lua_printstack( lua_State* L )
 {
 	idLib::Printf( "Lua stack: " );
-	
+
 	int top = lua_gettop( L );
-	
+
 	for( int i = 1; i <= top; i++ )
 	{
 		int t = lua_type( L, i );
-		
+
 		switch( t )
 		{
 			case LUA_TNUMBER:
 				idLib::Printf( "'%g'", lua_tonumber( L, i ) );
 				break;
-				
+
 			case LUA_TBOOLEAN:
 				idLib::Printf( "'%s'", lua_toboolean( L, i ) ? "true" : "false" );
 				break;
-				
+
 			case LUA_TSTRING:
 				idLib::Printf( "'%s'", lua_tostring( L, i ) );
 				break;
-				
+
 			default:
 				idLib::Printf( "%s", lua_typename( L, t ) );
 				break;
 		}
-		
+
 		idLib::Printf( " " );
 	}
-	
+
 	idLib::Printf( "\n" );
 }

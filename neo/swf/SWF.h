@@ -532,13 +532,13 @@ public:
 	// RB: LUA INTEGRATION
 	static void*				LuaAlloc( void* ud, void* ptr, size_t osize, size_t nsize );
 	static int					LuaPanic( lua_State* L );
-	
+
 public:
 	lua_State*					GetLuaState() const
 	{
 		return luaState;
 	}
-	
+
 private:
 	static int					LuaNativeScriptFunctionCall( lua_State* L );
 	static idSWFSpriteInstance* luaSpriteInstance;
@@ -546,7 +546,7 @@ private:
 	{
 		luaSpriteInstance = spriteInstance;
 	}
-	
+
 	lua_State*					luaState;
 	// RB end
 };

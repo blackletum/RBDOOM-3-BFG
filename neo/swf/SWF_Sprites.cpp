@@ -462,15 +462,15 @@ void idSWFSprite::ReadJSON( rapidjson::Value& entry )
 		else if( type == "Tag_DoLua" )
 		{
 			commands[i].tag = Tag_DoLua;
-			
+
 			idFile_SWF file( new idFile_Memory() );
-			
+
 			idStr string = command["function"].GetString();
 			string.Append( '\0' );
 			int len = string.Length();
-			
+
 			file->Write( string.c_str(), len );
-			
+
 			uint32 streamLength = file->Length();// - 1; // skip trailing zero added by Decode()
 			commands[i].stream.Load( ( byte* ) static_cast<idFile_Memory*>( ( idFile* )file )->GetDataPtr(), streamLength, true );
 		}
@@ -512,7 +512,7 @@ void idSWFSprite::WriteJSON( idFile* f, idFile* luaFile, int characterID )
 		command.stream.Rewind();
 		switch( command.tag )
 		{
-		
+
 #define HANDLE_SWF_TAG( x ) case Tag_##x: WriteJSON_##x( f, luaFile, command.stream, characterID, i ); break;
 				HANDLE_SWF_TAG( PlaceObject2 );
 				HANDLE_SWF_TAG( PlaceObject3 );
@@ -726,7 +726,7 @@ void idSWFSprite::WriteJSON_DoAction( idFile* file, idFile* luaFile, idSWFBitStr
 
 	base64.Encode( bitstream.Ptr(), bitstream.Length() );
 
-#if 1
+#if 0
 	//file->WriteFloatString( "%s\t\t\t\t{\t\"type\": \"Tag_DoAction\", \"streamLength\": %i, \"stream\": \"%s\" }", ( commandID != 0 ) ? ",\n" : "", bitstream.Length(), base64.c_str() );
 	file->WriteFloatString( "%s\t\t\t\t{\t\"type\": \"Tag_DoAction\", \"streamLength\": %i, \"stream\": \"FIXME\" }", ( commandID != 0 ) ? ",\n" : "", bitstream.Length() );
 #else
@@ -755,21 +755,23 @@ void idSWFSprite::WriteJSON_DoAction( idFile* file, idFile* luaFile, idSWFBitStr
 		luaFile->WriteFloatString( "\n%s\n", scriptText.c_str() );
 
 		//file->WriteFloatString( "%s\t\t\t\t{\n\t\t\t\t\t\"type\": \"Tag_DoAction\", \"streamLength\": %i, \"stream\": \"%s\",\n\t\t\t\t\t\"luaCode\": %s\n\t\t\t\t}", ( commandID != 0 ) ? ",\n" : "", bitstream.Length(), base64.c_str(), quotedText.c_str() );
-	
+
 		file->WriteFloatString( "%s\t\t\t\t{\n\t\t\t\t\t\"type\": \"Tag_DoLua\",\n\t\t\t\t\t\"function\": \"sprite%i_action%i\"\n\t\t\t\t}", ( commandID != 0 ) ? ",\n" : "", characterID, commandID );
-	
+
 		delete actionScript;
 		delete scriptObject;
 	}
+#endif
+
 #endif
 }
 
 void idSWFSprite::WriteJSON_DoLua( idFile* file, idFile* luaFile, idSWFBitStream& bitstream, int characterID, int commandID, const char* indentPrefix )
 {
 	idStr str( ( const char* ) bitstream.Ptr(), 0, bitstream.Length() );
-	
+
 	file->WriteFloatString( "%s\t\t\t\t{\n\t\t\t\t\t\"type\": \"Tag_DoLua\",\n\t\t\t\t\t\"function\": \"%s\"\n\t\t\t\t}", ( commandID != 0 ) ? ",\n" : "", str.c_str() );
-	
+
 	//file->WriteFloatString( "%s\t\t\t\t{\n\t\t\t\t\t\"type\": \"Tag_DoLua\",\n\t\t\t\t\t\"function\": \"sprite%i_action%i\"\n\t\t\t\t}", ( commandID != 0 ) ? ",\n" : "", characterID, commandID );
 }
 

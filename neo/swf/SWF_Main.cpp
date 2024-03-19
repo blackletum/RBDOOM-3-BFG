@@ -341,10 +341,10 @@ idSWF::idSWF( const char* filename_, idSoundWorld* soundWorld_ )
 	{
 		lua_atpanic( L, &LuaPanic );
 	}
-	
+
 	luaL_openlibs( L );
 	idSWFSpriteInstance::LuaRegister_idSWFSpriteInstance( L );
-	
+
 	// RB: also use globals->Set to register functions into the Lua state
 	globals = idSWFScriptObject::Alloc();
 	globals->Set( "_global", globals );
@@ -392,14 +392,14 @@ idSWF::idSWF( const char* filename_, idSoundWorld* soundWorld_ )
 	globals->SetNative( "cropToFit", swfScriptVar_crop.Bind( this ) );
 	globals->SetNative( "crop", swfScriptVar_crop.Bind( this ) );
 
-	
-	
+
+
 	//ID_TIME_T luaTimestamp;
 	idStr luaFileName = filename;
 	luaFileName.SetFileExtension( ".lua" );
-	
+
 	char* luaSrc;
-	
+
 	fileSystem->ReadFile( luaFileName, ( void** ) &luaSrc );
 	if( luaSrc != NULL )
 	{
@@ -409,20 +409,20 @@ idSWF::idSWF( const char* filename_, idSoundWorld* soundWorld_ )
 			idLib::Error( "Compile of file %s failed: %s ", luaFileName.c_str(), lua_tostring( L, -1 ) );
 			lua_pop( L, 1 );
 		}
-		
+
 		fileSystem->FreeFile( luaSrc );
-		
+
 		if( lua_pcall( L, 0, 0, 0 ) )
 		{
 			idLib::Error( "Cannot pcall: %s", lua_tostring( L, -1 ) );
 			lua_pop( L, 1 );
 		}
 	}
-	
+
 	lua_printstack( L );
 	// RB end
-	
-	
+
+
 	// Do this to touch any external references (like sounds)
 	// But disable script warnings because many globals won't have been created yet
 	extern idCVar swf_debug;
@@ -535,13 +535,13 @@ bool idSWF::InhibitControl()
 void idSWF::SetGlobal( const char* name, const idSWFScriptVar& value )
 {
 	globals->Set( name, value );
-	
+
 	if( value.IsFunction() )
 	{
 		lua_State* L = luaState;
-		
+
 		lua_getglobal( L, name ); // ... ( function | nil )
-		
+
 		if( lua_isfunction( L, -1 ) )
 		{
 			// already added
@@ -550,14 +550,14 @@ void idSWF::SetGlobal( const char* name, const idSWFScriptVar& value )
 		{
 			// ... nil
 			lua_pop( L, 1 ); // ...
-			
+
 			// http://stackoverflow.com/questions/2907221/get-the-lua-command-when-a-c-function-is-called
-			
+
 			lua_pushstring( L, name );
 			lua_pushcclosure( L, LuaNativeScriptFunctionCall, 1 );
 			lua_setglobal( L, name );
 		}
-		
+
 		//lua_printstack( L );
 	}
 }

@@ -241,18 +241,18 @@ public:
 	uint32					FindFrame( const char* frameLabel ) const;
 	bool					FrameExists( const char* frameLabel ) const;
 	bool					IsBetweenFrames( const char* frameLabel1, const char* frameLabel2 ) const;
-	
+
 	// RB begin
 	static int				Lua_new( lua_State* L );
 	static int				Lua_gc( lua_State* L );
 	static int				Lua_index( lua_State* L );
 	static int				Lua_newindex( lua_State* L );
 	static int				Lua_tostring( lua_State* L );
-	
+
 	static int				Lua_stop( lua_State* L );
 	static int				Lua_play( lua_State* L );
 	static int				Lua_gotoAndPlay( lua_State* L );
-	
+
 	static int				LuaRegister_idSWFSpriteInstance( lua_State* L );
 	// RB end
 };
