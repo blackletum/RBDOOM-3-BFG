@@ -132,7 +132,7 @@ stateResult_t	iceMonster_Turret::combat_attack( stateParms_t* parms )
 	}
 
 	//should never hit, satisfying compiler.
-	assert( 0, "DANGER DANGER, MR ROBINSON" );
+	//assert( 0, "DANGER DANGER, MR ROBINSON" );
 	return SRESULT_DONE;
 }
 
@@ -359,10 +359,10 @@ stateResult_t iceMonster_Turret::state_Disabled( stateParms_t* parms )
 			enemy = NextEnemy( NULL );
 			while( enemy )
 			{
-				idAI* enm = enemy->Cast<idAI>( );
+				idAI* enm = enemy->Cast<idAI>();
 				if( enm )
 				{
-					enm->ClearEnemy( );
+					enm->ClearEnemy();
 				}
 				enemy = NextEnemy( NULL );
 			}
@@ -381,7 +381,7 @@ stateResult_t iceMonster_Turret::state_Disabled( stateParms_t* parms )
 			break;
 		default:
 			//should never hit!
-			assert( 0, "DANGER DANGER MR ROBINSON" );
+			//assert( 0, "DANGER DANGER MR ROBINSON" );
 			break;
 	}
 
@@ -412,7 +412,7 @@ stateResult_t iceMonster_Turret::state_Idle( stateParms_t* parms )
 	}
 
 	//should never hit, satisfying compiler.
-	assert( 0, "DANGER DANGER MR ROBINSON" );
+	//assert( 0, "DANGER DANGER MR ROBINSON" );
 	return SRESULT_DONE;
 }
 

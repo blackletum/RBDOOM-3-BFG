@@ -7,9 +7,9 @@
 
 	This file has been generated with the Type Info Generator v1.1 (c) 2004 id Software
 
-	959 constants
+	958 constants
 	92 enums
-	475 classes/structs/unions
+	471 classes/structs/unions
 	3 templates
 	8 max inheritance level for 'iceMonsterZombieSawyer'
 
@@ -87,6 +87,7 @@ static constantInfo_t constantInfo[] = {
 	{ "int", "idVarDef::initializedVariable", "1" },
 	{ "int", "idVarDef::initializedConstant", "2" },
 	{ "int", "idVarDef::stackVariable", "3" },
+	{ "int", "statement_s::FLAG_OBJECTCALL_IMPL_NOT_PARSED_YET", "1" },
 	{ "const int", "ANIM_NumAnimChannels", "5" },
 	{ "const int", "ANIM_MaxAnimsPerChannel", "3" },
 	{ "const int", "ANIM_MaxSyncedAnims", "3" },
@@ -769,7 +770,7 @@ static constantInfo_t constantInfo[] = {
 	{ "int", "idMenuScreen_Shell_GameOptions::idMenuDataSource_GameSettings::GAME_FIELD_AUTO_RELOAD", "3" },
 	{ "int", "idMenuScreen_Shell_GameOptions::idMenuDataSource_GameSettings::GAME_FIELD_AIM_ASSIST", "4" },
 	{ "int", "idMenuScreen_Shell_GameOptions::idMenuDataSource_GameSettings::GAME_FIELD_ALWAYS_SPRINT", "5" },
-	{ "int", "idMenuScreen_Shell_GameOptions::idMenuDataSource_GameSettings::GAME_FIELD_FLASHLIGHT_SHADOWS", "6" },
+	{ "int", "idMenuScreen_Shell_GameOptions::idMenuDataSource_GameSettings::GAME_FIELD_CLASSIC_FLASHLIGHT", "6" },
 	{ "int", "idMenuScreen_Shell_GameOptions::idMenuDataSource_GameSettings::GAME_FIELD_MUZZLE_FLASHES", "7" },
 	{ "int", "idMenuScreen_Shell_GameOptions::idMenuDataSource_GameSettings::MAX_GAME_FIELDS", "8" },
 	{ "int", "idMenuScreen_Shell_MatchSettings::idMenuDataSource_MatchSettings::MATCH_FIELD_MODE", "0" },
@@ -796,16 +797,15 @@ static constantInfo_t constantInfo[] = {
 	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::SYSTEM_FIELD_FRAMERATE", "2" },
 	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::SYSTEM_FIELD_VSYNC", "3" },
 	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::SYSTEM_FIELD_ANTIALIASING", "4" },
-	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::SYSTEM_FIELD_POSTFX", "5" },
-	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::SYSTEM_FIELD_SSAO", "6" },
-	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::SYSTEM_FIELD_AMBIENT_BRIGHTNESS", "7" },
-	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::SYSTEM_FIELD_BRIGHTNESS", "8" },
-	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::SYSTEM_FIELD_VOLUME", "9" },
-	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::MAX_SYSTEM_FIELDS", "10" },
-	{ "int", "idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings::STEREO_FIELD_ENABLE", "0" },
-	{ "int", "idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings::STEREO_FIELD_SEPERATION", "1" },
-	{ "int", "idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings::STEREO_FIELD_SWAP_EYES", "2" },
-	{ "int", "idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings::MAX_STEREO_FIELDS", "3" },
+	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::SYSTEM_FIELD_RENDERMODE", "5" },
+	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::SYSTEM_FIELD_AMBIENT_BRIGHTNESS", "6" },
+	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::SYSTEM_FIELD_SSAO", "7" },
+	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::SYSTEM_FIELD_BLOOD_REFLECTIONS", "8" },
+	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::SYSTEM_FIELD_FILMIC_POSTFX", "9" },
+	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::SYSTEM_FIELD_CRT_POSTFX", "10" },
+	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::SYSTEM_FIELD_BRIGHTNESS", "11" },
+	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::SYSTEM_FIELD_VOLUME", "12" },
+	{ "int", "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::MAX_SYSTEM_FIELDS", "13" },
 	{ "int", "SHELL_AREA_INVALID", "-1" },
 	{ "int", "SHELL_AREA_START", "0" },
 	{ "int", "SHELL_AREA_ROOT", "1" },
@@ -818,25 +818,24 @@ static constantInfo_t constantInfo[] = {
 	{ "int", "SHELL_AREA_SYSTEM_OPTIONS", "8" },
 	{ "int", "SHELL_AREA_MULTIPLAYER", "9" },
 	{ "int", "SHELL_AREA_GAME_LOBBY", "10" },
-	{ "int", "SHELL_AREA_STEREOSCOPICS", "11" },
-	{ "int", "SHELL_AREA_PARTY_LOBBY", "12" },
-	{ "int", "SHELL_AREA_SETTINGS", "13" },
-	{ "int", "SHELL_AREA_AUDIO", "14" },
-	{ "int", "SHELL_AREA_VIDEO", "15" },
-	{ "int", "SHELL_AREA_KEYBOARD", "16" },
-	{ "int", "SHELL_AREA_CONTROLS", "17" },
-	{ "int", "SHELL_AREA_CONTROLLER_LAYOUT", "18" },
-	{ "int", "SHELL_AREA_GAMEPAD", "19" },
-	{ "int", "SHELL_AREA_PAUSE", "20" },
-	{ "int", "SHELL_AREA_LEADERBOARDS", "21" },
-	{ "int", "SHELL_AREA_PLAYSTATION", "22" },
-	{ "int", "SHELL_AREA_DIFFICULTY", "23" },
-	{ "int", "SHELL_AREA_RESOLUTION", "24" },
-	{ "int", "SHELL_AREA_MATCH_SETTINGS", "25" },
-	{ "int", "SHELL_AREA_MODE_SELECT", "26" },
-	{ "int", "SHELL_AREA_BROWSER", "27" },
-	{ "int", "SHELL_AREA_CREDITS", "28" },
-	{ "int", "SHELL_NUM_AREAS", "29" },
+	{ "int", "SHELL_AREA_PARTY_LOBBY", "11" },
+	{ "int", "SHELL_AREA_SETTINGS", "12" },
+	{ "int", "SHELL_AREA_AUDIO", "13" },
+	{ "int", "SHELL_AREA_VIDEO", "14" },
+	{ "int", "SHELL_AREA_KEYBOARD", "15" },
+	{ "int", "SHELL_AREA_CONTROLS", "16" },
+	{ "int", "SHELL_AREA_CONTROLLER_LAYOUT", "17" },
+	{ "int", "SHELL_AREA_GAMEPAD", "18" },
+	{ "int", "SHELL_AREA_PAUSE", "19" },
+	{ "int", "SHELL_AREA_LEADERBOARDS", "20" },
+	{ "int", "SHELL_AREA_PLAYSTATION", "21" },
+	{ "int", "SHELL_AREA_DIFFICULTY", "22" },
+	{ "int", "SHELL_AREA_RESOLUTION", "23" },
+	{ "int", "SHELL_AREA_MATCH_SETTINGS", "24" },
+	{ "int", "SHELL_AREA_MODE_SELECT", "25" },
+	{ "int", "SHELL_AREA_BROWSER", "26" },
+	{ "int", "SHELL_AREA_CREDITS", "27" },
+	{ "int", "SHELL_NUM_AREAS", "28" },
 	{ "int", "SHELL_STATE_INVALID", "-1" },
 	{ "int", "SHELL_STATE_PRESS_START", "0" },
 	{ "int", "SHELL_STATE_IDLE", "1" },
@@ -1050,6 +1049,11 @@ static enumValueInfo_t idVarDef_initialized_t_typeInfo[] = {
 	{ NULL, 0 }
 };
 
+static enumValueInfo_t statement_s_enum_3_typeInfo[] = {
+	{ "FLAG_OBJECTCALL_IMPL_NOT_PARSED_YET", 1 },
+	{ NULL, 0 }
+};
+
 static enumValueInfo_t jointModTransform_t_typeInfo[] = {
 	{ "JOINTMOD_NONE", 0 },
 	{ "JOINTMOD_LOCAL", 1 },
@@ -1115,7 +1119,7 @@ static enumValueInfo_t AFJointModType_t_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t enum_6_typeInfo[] = {
+static enumValueInfo_t enum_7_typeInfo[] = {
 	{ "PATHTYPE_WALK", 0 },
 	{ "PATHTYPE_WALKOFFLEDGE", 1 },
 	{ "PATHTYPE_BARRIERJUMP", 2 },
@@ -1219,7 +1223,7 @@ static enumValueInfo_t idMultiplayerGame_msg_evt_t_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t enum_14_typeInfo[] = {
+static enumValueInfo_t enum_15_typeInfo[] = {
 	{ "GAME_RELIABLE_MESSAGE_SYNCEDCVARS", 0 },
 	{ "GAME_RELIABLE_MESSAGE_SPAWN_PLAYER", 1 },
 	{ "GAME_RELIABLE_MESSAGE_CHAT", 2 },
@@ -1353,7 +1357,7 @@ static enumValueInfo_t constraintType_t_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t enum_26_typeInfo[] = {
+static enumValueInfo_t enum_27_typeInfo[] = {
 	{ "TH_ALL", -1 },
 	{ "TH_THINK", 1 },
 	{ "TH_PHYSICS", 2 },
@@ -1378,7 +1382,7 @@ static enumValueInfo_t signalNum_t_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t idEntity_enum_28_typeInfo[] = {
+static enumValueInfo_t idEntity_enum_29_typeInfo[] = {
 	{ "EVENT_STARTSOUNDSHADER", 0 },
 	{ "EVENT_STOPSOUNDSHADER", 1 },
 	{ "EVENT_MAXEVENTS", 2 },
@@ -1392,19 +1396,19 @@ static enumValueInfo_t idEntity_interpolationBehavior_t_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t idAnimatedEntity_enum_30_typeInfo[] = {
+static enumValueInfo_t idAnimatedEntity_enum_31_typeInfo[] = {
 	{ "EVENT_ADD_DAMAGE_EFFECT", 2 },
 	{ "EVENT_MAXEVENTS", 3 },
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t idPlayerStart_enum_31_typeInfo[] = {
+static enumValueInfo_t idPlayerStart_enum_32_typeInfo[] = {
 	{ "EVENT_TELEPORTPLAYER", 2 },
 	{ "EVENT_MAXEVENTS", 3 },
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t idProjectile_enum_32_typeInfo[] = {
+static enumValueInfo_t idProjectile_enum_33_typeInfo[] = {
 	{ "EVENT_DAMAGE_EFFECT", 2 },
 	{ "EVENT_MAXEVENTS", 3 },
 	{ NULL, 0 }
@@ -1419,7 +1423,7 @@ static enumValueInfo_t idProjectile_projectileState_t_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t idWeapon_enum_34_typeInfo[] = {
+static enumValueInfo_t idWeapon_enum_35_typeInfo[] = {
 	{ "EVENT_RELOAD", 2 },
 	{ "EVENT_ENDRELOAD", 3 },
 	{ "EVENT_CHANGESKIN", 4 },
@@ -1427,13 +1431,13 @@ static enumValueInfo_t idWeapon_enum_34_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t idLight_enum_35_typeInfo[] = {
+static enumValueInfo_t idLight_enum_36_typeInfo[] = {
 	{ "EVENT_BECOMEBROKEN", 2 },
 	{ "EVENT_MAXEVENTS", 3 },
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t EnvironmentProbe_enum_36_typeInfo[] = {
+static enumValueInfo_t EnvironmentProbe_enum_37_typeInfo[] = {
 	{ "EVENT_BECOMEBROKEN", 2 },
 	{ "EVENT_MAXEVENTS", 3 },
 	{ NULL, 0 }
@@ -1446,7 +1450,7 @@ static enumValueInfo_t itemGiveFlags_t_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t idItem_enum_38_typeInfo[] = {
+static enumValueInfo_t idItem_enum_39_typeInfo[] = {
 	{ "EVENT_PICKUP", 2 },
 	{ "EVENT_RESPAWN", 3 },
 	{ "EVENT_RESPAWNFX", 4 },
@@ -1458,7 +1462,7 @@ static enumValueInfo_t idItem_enum_38_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t FxFader_enum_39_typeInfo[] = {
+static enumValueInfo_t FxFader_enum_40_typeInfo[] = {
 	{ "FX_STATE_OFF", 0 },
 	{ "FX_STATE_RAMPUP", 1 },
 	{ "FX_STATE_RAMPDOWN", 2 },
@@ -1563,7 +1567,7 @@ static enumValueInfo_t gameExpansionType_t_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t enum_43_typeInfo[] = {
+static enumValueInfo_t enum_44_typeInfo[] = {
 	{ "BERSERK", 0 },
 	{ "INVISIBILITY", 1 },
 	{ "MEGAHEALTH", 2 },
@@ -1576,7 +1580,7 @@ static enumValueInfo_t enum_43_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t enum_44_typeInfo[] = {
+static enumValueInfo_t enum_45_typeInfo[] = {
 	{ "SPEED", 0 },
 	{ "PROJECTILE_DAMAGE", 1 },
 	{ "MELEE_DAMAGE", 2 },
@@ -1584,7 +1588,7 @@ static enumValueInfo_t enum_44_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t enum_45_typeInfo[] = {
+static enumValueInfo_t enum_46_typeInfo[] = {
 	{ "INFLUENCE_NONE", 0 },
 	{ "INFLUENCE_LEVEL1", 1 },
 	{ "INFLUENCE_LEVEL2", 2 },
@@ -1592,7 +1596,7 @@ static enumValueInfo_t enum_45_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t idPlayer_enum_46_typeInfo[] = {
+static enumValueInfo_t idPlayer_enum_47_typeInfo[] = {
 	{ "EVENT_IMPULSE", 2 },
 	{ "EVENT_EXIT_TELEPORTER", 3 },
 	{ "EVENT_ABORT_TELEPORTER", 4 },
@@ -1652,7 +1656,7 @@ static enumValueInfo_t moverState_t_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t idExplodingBarrel_enum_52_typeInfo[] = {
+static enumValueInfo_t idExplodingBarrel_enum_53_typeInfo[] = {
 	{ "EVENT_EXPLODE", 2 },
 	{ "EVENT_MAXEVENTS", 3 },
 	{ NULL, 0 }
@@ -1666,7 +1670,7 @@ static enumValueInfo_t idExplodingBarrel_explode_state_t_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t idSecurityCamera_enum_54_typeInfo[] = {
+static enumValueInfo_t idSecurityCamera_enum_55_typeInfo[] = {
 	{ "SCANNING", 0 },
 	{ "LOSINGINTEREST", 1 },
 	{ "ALERT", 2 },
@@ -1674,7 +1678,7 @@ static enumValueInfo_t idSecurityCamera_enum_54_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static enumValueInfo_t idBrittleFracture_enum_55_typeInfo[] = {
+static enumValueInfo_t idBrittleFracture_enum_56_typeInfo[] = {
 	{ "EVENT_PROJECT_DECAL", 2 },
 	{ "EVENT_SHATTER", 3 },
 	{ "EVENT_MAXEVENTS", 4 },
@@ -1954,7 +1958,7 @@ static enumValueInfo_t idMenuScreen_Shell_GameOptions_idMenuDataSource_GameSetti
 	{ "GAME_FIELD_AUTO_RELOAD", 3 },
 	{ "GAME_FIELD_AIM_ASSIST", 4 },
 	{ "GAME_FIELD_ALWAYS_SPRINT", 5 },
-	{ "GAME_FIELD_FLASHLIGHT_SHADOWS", 6 },
+	{ "GAME_FIELD_CLASSIC_FLASHLIGHT", 6 },
 	{ "GAME_FIELD_MUZZLE_FLASHES", 7 },
 	{ "MAX_GAME_FIELDS", 8 },
 	{ NULL, 0 }
@@ -2001,20 +2005,15 @@ static enumValueInfo_t idMenuScreen_Shell_SystemOptions_idMenuDataSource_SystemS
 	{ "SYSTEM_FIELD_FRAMERATE", 2 },
 	{ "SYSTEM_FIELD_VSYNC", 3 },
 	{ "SYSTEM_FIELD_ANTIALIASING", 4 },
-	{ "SYSTEM_FIELD_POSTFX", 5 },
-	{ "SYSTEM_FIELD_SSAO", 6 },
-	{ "SYSTEM_FIELD_AMBIENT_BRIGHTNESS", 7 },
-	{ "SYSTEM_FIELD_BRIGHTNESS", 8 },
-	{ "SYSTEM_FIELD_VOLUME", 9 },
-	{ "MAX_SYSTEM_FIELDS", 10 },
-	{ NULL, 0 }
-};
-
-static enumValueInfo_t idMenuScreen_Shell_Stereoscopics_idMenuDataSource_StereoSettings_stereoSettingFields_t_typeInfo[] = {
-	{ "STEREO_FIELD_ENABLE", 0 },
-	{ "STEREO_FIELD_SEPERATION", 1 },
-	{ "STEREO_FIELD_SWAP_EYES", 2 },
-	{ "MAX_STEREO_FIELDS", 3 },
+	{ "SYSTEM_FIELD_RENDERMODE", 5 },
+	{ "SYSTEM_FIELD_AMBIENT_BRIGHTNESS", 6 },
+	{ "SYSTEM_FIELD_SSAO", 7 },
+	{ "SYSTEM_FIELD_BLOOD_REFLECTIONS", 8 },
+	{ "SYSTEM_FIELD_FILMIC_POSTFX", 9 },
+	{ "SYSTEM_FIELD_CRT_POSTFX", 10 },
+	{ "SYSTEM_FIELD_BRIGHTNESS", 11 },
+	{ "SYSTEM_FIELD_VOLUME", 12 },
+	{ "MAX_SYSTEM_FIELDS", 13 },
 	{ NULL, 0 }
 };
 
@@ -2031,25 +2030,24 @@ static enumValueInfo_t shellAreas_t_typeInfo[] = {
 	{ "SHELL_AREA_SYSTEM_OPTIONS", 8 },
 	{ "SHELL_AREA_MULTIPLAYER", 9 },
 	{ "SHELL_AREA_GAME_LOBBY", 10 },
-	{ "SHELL_AREA_STEREOSCOPICS", 11 },
-	{ "SHELL_AREA_PARTY_LOBBY", 12 },
-	{ "SHELL_AREA_SETTINGS", 13 },
-	{ "SHELL_AREA_AUDIO", 14 },
-	{ "SHELL_AREA_VIDEO", 15 },
-	{ "SHELL_AREA_KEYBOARD", 16 },
-	{ "SHELL_AREA_CONTROLS", 17 },
-	{ "SHELL_AREA_CONTROLLER_LAYOUT", 18 },
-	{ "SHELL_AREA_GAMEPAD", 19 },
-	{ "SHELL_AREA_PAUSE", 20 },
-	{ "SHELL_AREA_LEADERBOARDS", 21 },
-	{ "SHELL_AREA_PLAYSTATION", 22 },
-	{ "SHELL_AREA_DIFFICULTY", 23 },
-	{ "SHELL_AREA_RESOLUTION", 24 },
-	{ "SHELL_AREA_MATCH_SETTINGS", 25 },
-	{ "SHELL_AREA_MODE_SELECT", 26 },
-	{ "SHELL_AREA_BROWSER", 27 },
-	{ "SHELL_AREA_CREDITS", 28 },
-	{ "SHELL_NUM_AREAS", 29 },
+	{ "SHELL_AREA_PARTY_LOBBY", 11 },
+	{ "SHELL_AREA_SETTINGS", 12 },
+	{ "SHELL_AREA_AUDIO", 13 },
+	{ "SHELL_AREA_VIDEO", 14 },
+	{ "SHELL_AREA_KEYBOARD", 15 },
+	{ "SHELL_AREA_CONTROLS", 16 },
+	{ "SHELL_AREA_CONTROLLER_LAYOUT", 17 },
+	{ "SHELL_AREA_GAMEPAD", 18 },
+	{ "SHELL_AREA_PAUSE", 19 },
+	{ "SHELL_AREA_LEADERBOARDS", 20 },
+	{ "SHELL_AREA_PLAYSTATION", 21 },
+	{ "SHELL_AREA_DIFFICULTY", 22 },
+	{ "SHELL_AREA_RESOLUTION", 23 },
+	{ "SHELL_AREA_MATCH_SETTINGS", 24 },
+	{ "SHELL_AREA_MODE_SELECT", 25 },
+	{ "SHELL_AREA_BROWSER", 26 },
+	{ "SHELL_AREA_CREDITS", 27 },
+	{ "SHELL_NUM_AREAS", 28 },
 	{ NULL, 0 }
 };
 
@@ -2253,10 +2251,11 @@ static enumTypeInfo_t enumTypeInfo[] = {
 	{ "stateResult_t", stateResult_t_typeInfo },
 	{ "etype_t", etype_t_typeInfo },
 	{ "idVarDef::initialized_t", idVarDef_initialized_t_typeInfo },
+	{ "statement_s::enum_3", statement_s_enum_3_typeInfo },
 	{ "jointModTransform_t", jointModTransform_t_typeInfo },
 	{ "frameCommandType_t", frameCommandType_t_typeInfo },
 	{ "AFJointModType_t", AFJointModType_t_typeInfo },
-	{ "enum_6", enum_6_typeInfo },
+	{ "enum_7", enum_7_typeInfo },
 	{ "pvsType_t", pvsType_t_typeInfo },
 	{ "gameType_t", gameType_t_typeInfo },
 	{ "flagStatus_t", flagStatus_t_typeInfo },
@@ -2264,7 +2263,7 @@ static enumTypeInfo_t enumTypeInfo[] = {
 	{ "snd_evt_t", snd_evt_t_typeInfo },
 	{ "idMultiplayerGame::gameState_t", idMultiplayerGame_gameState_t_typeInfo },
 	{ "idMultiplayerGame::msg_evt_t", idMultiplayerGame_msg_evt_t_typeInfo },
-	{ "enum_14", enum_14_typeInfo },
+	{ "enum_15", enum_15_typeInfo },
 	{ "gameState_t", gameState_t_typeInfo },
 	{ "idEventQueue::outOfOrderBehaviour_t", idEventQueue_outOfOrderBehaviour_t_typeInfo },
 	{ "slowmoState_t", slowmoState_t_typeInfo },
@@ -2276,36 +2275,36 @@ static enumTypeInfo_t enumTypeInfo[] = {
 	{ "pmtype_t", pmtype_t_typeInfo },
 	{ "waterLevel_t", waterLevel_t_typeInfo },
 	{ "constraintType_t", constraintType_t_typeInfo },
-	{ "enum_26", enum_26_typeInfo },
+	{ "enum_27", enum_27_typeInfo },
 	{ "signalNum_t", signalNum_t_typeInfo },
-	{ "idEntity::enum_28", idEntity_enum_28_typeInfo },
+	{ "idEntity::enum_29", idEntity_enum_29_typeInfo },
 	{ "idEntity::interpolationBehavior_t", idEntity_interpolationBehavior_t_typeInfo },
-	{ "idAnimatedEntity::enum_30", idAnimatedEntity_enum_30_typeInfo },
-	{ "idPlayerStart::enum_31", idPlayerStart_enum_31_typeInfo },
-	{ "idProjectile::enum_32", idProjectile_enum_32_typeInfo },
+	{ "idAnimatedEntity::enum_31", idAnimatedEntity_enum_31_typeInfo },
+	{ "idPlayerStart::enum_32", idPlayerStart_enum_32_typeInfo },
+	{ "idProjectile::enum_33", idProjectile_enum_33_typeInfo },
 	{ "idProjectile::projectileState_t", idProjectile_projectileState_t_typeInfo },
-	{ "idWeapon::enum_34", idWeapon_enum_34_typeInfo },
-	{ "idLight::enum_35", idLight_enum_35_typeInfo },
-	{ "EnvironmentProbe::enum_36", EnvironmentProbe_enum_36_typeInfo },
+	{ "idWeapon::enum_35", idWeapon_enum_35_typeInfo },
+	{ "idLight::enum_36", idLight_enum_36_typeInfo },
+	{ "EnvironmentProbe::enum_37", EnvironmentProbe_enum_37_typeInfo },
 	{ "itemGiveFlags_t", itemGiveFlags_t_typeInfo },
-	{ "idItem::enum_38", idItem_enum_38_typeInfo },
-	{ "FxFader::enum_39", FxFader_enum_39_typeInfo },
+	{ "idItem::enum_39", idItem_enum_39_typeInfo },
+	{ "FxFader::enum_40", FxFader_enum_40_typeInfo },
 	{ "playerIconType_t", playerIconType_t_typeInfo },
 	{ "achievement_t", achievement_t_typeInfo },
 	{ "gameExpansionType_t", gameExpansionType_t_typeInfo },
-	{ "enum_43", enum_43_typeInfo },
 	{ "enum_44", enum_44_typeInfo },
 	{ "enum_45", enum_45_typeInfo },
-	{ "idPlayer::enum_46", idPlayer_enum_46_typeInfo },
+	{ "enum_46", enum_46_typeInfo },
+	{ "idPlayer::enum_47", idPlayer_enum_47_typeInfo },
 	{ "idMover::moveStage_t", idMover_moveStage_t_typeInfo },
 	{ "idMover::moverCommand_t", idMover_moverCommand_t_typeInfo },
 	{ "idMover::moverDir_t", idMover_moverDir_t_typeInfo },
 	{ "idElevator::elevatorState_t", idElevator_elevatorState_t_typeInfo },
 	{ "moverState_t", moverState_t_typeInfo },
-	{ "idExplodingBarrel::enum_52", idExplodingBarrel_enum_52_typeInfo },
+	{ "idExplodingBarrel::enum_53", idExplodingBarrel_enum_53_typeInfo },
 	{ "idExplodingBarrel::explode_state_t", idExplodingBarrel_explode_state_t_typeInfo },
-	{ "idSecurityCamera::enum_54", idSecurityCamera_enum_54_typeInfo },
-	{ "idBrittleFracture::enum_55", idBrittleFracture_enum_55_typeInfo },
+	{ "idSecurityCamera::enum_55", idSecurityCamera_enum_55_typeInfo },
+	{ "idBrittleFracture::enum_56", idBrittleFracture_enum_56_typeInfo },
 	{ "moveType_t", moveType_t_typeInfo },
 	{ "moveCommand_t", moveCommand_t_typeInfo },
 	{ "talkState_t", talkState_t_typeInfo },
@@ -2332,7 +2331,6 @@ static enumTypeInfo_t enumTypeInfo[] = {
 	{ "idMenuScreen_Shell_Gamepad::idMenuDataSource_GamepadSettings::controlSettingFields_t", idMenuScreen_Shell_Gamepad_idMenuDataSource_GamepadSettings_controlSettingFields_t_typeInfo },
 	{ "idMenuScreen_Shell_ControllerLayout::idMenuDataSource_LayoutSettings::controlSettingFields_t", idMenuScreen_Shell_ControllerLayout_idMenuDataSource_LayoutSettings_controlSettingFields_t_typeInfo },
 	{ "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::systemSettingFields_t", idMenuScreen_Shell_SystemOptions_idMenuDataSource_SystemSettings_systemSettingFields_t_typeInfo },
-	{ "idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings::stereoSettingFields_t", idMenuScreen_Shell_Stereoscopics_idMenuDataSource_StereoSettings_stereoSettingFields_t_typeInfo },
 	{ "shellAreas_t", shellAreas_t_typeInfo },
 	{ "shellState_t", shellState_t_typeInfo },
 	{ "pdaAreas_t", pdaAreas_t_typeInfo },
@@ -2546,11 +2544,12 @@ static classVariableInfo_t idVarDefName_typeInfo[] = {
 
 static classVariableInfo_t statement_t_typeInfo[] = {
 	{ "unsigned short", "op", (intptr_t)(&((statement_t *)0)->op), sizeof( ((statement_t *)0)->op ) },
+	{ "unsigned short", "flags", (intptr_t)(&((statement_t *)0)->flags), sizeof( ((statement_t *)0)->flags ) },
+	{ "unsigned short", "linenumber", (intptr_t)(&((statement_t *)0)->linenumber), sizeof( ((statement_t *)0)->linenumber ) },
+	{ "unsigned short", "file", (intptr_t)(&((statement_t *)0)->file), sizeof( ((statement_t *)0)->file ) },
 	{ "idVarDef *", "a", (intptr_t)(&((statement_t *)0)->a), sizeof( ((statement_t *)0)->a ) },
 	{ "idVarDef *", "b", (intptr_t)(&((statement_t *)0)->b), sizeof( ((statement_t *)0)->b ) },
 	{ "idVarDef *", "c", (intptr_t)(&((statement_t *)0)->c), sizeof( ((statement_t *)0)->c ) },
-	{ "unsigned short", "linenumber", (intptr_t)(&((statement_t *)0)->linenumber), sizeof( ((statement_t *)0)->linenumber ) },
-	{ "unsigned short", "file", (intptr_t)(&((statement_t *)0)->file), sizeof( ((statement_t *)0)->file ) },
 	{ NULL, 0 }
 };
 
@@ -2559,8 +2558,8 @@ static classVariableInfo_t idProgram_typeInfo[] = {
 	{ "idStr", "filename", (intptr_t)(&((idProgram *)0)->filename), sizeof( ((idProgram *)0)->filename ) },
 	{ "int", "filenum", (intptr_t)(&((idProgram *)0)->filenum), sizeof( ((idProgram *)0)->filenum ) },
 	{ "int", "numVariables", (intptr_t)(&((idProgram *)0)->numVariables), sizeof( ((idProgram *)0)->numVariables ) },
-	{ "byte[296608]", "variables", (intptr_t)(&((idProgram *)0)->variables), sizeof( ((idProgram *)0)->variables ) },
-	{ "idStaticList < byte , 296608 >", "variableDefaults", (intptr_t)(&((idProgram *)0)->variableDefaults), sizeof( ((idProgram *)0)->variableDefaults ) },
+	{ "byte[593216]", "variables", (intptr_t)(&((idProgram *)0)->variables), sizeof( ((idProgram *)0)->variables ) },
+	{ "idStaticList < byte , 296608 * 2 >", "variableDefaults", (intptr_t)(&((idProgram *)0)->variableDefaults), sizeof( ((idProgram *)0)->variableDefaults ) },
 	{ "idStaticList < function_t , 3584 >", "functions", (intptr_t)(&((idProgram *)0)->functions), sizeof( ((idProgram *)0)->functions ) },
 	{ "idStaticList < statement_t , 131072 >", "statements", (intptr_t)(&((idProgram *)0)->statements), sizeof( ((idProgram *)0)->statements ) },
 	{ "idList < idTypeDef * , TAG_SCRIPT >", "types", (intptr_t)(&((idProgram *)0)->types), sizeof( ((idProgram *)0)->types ) },
@@ -2679,6 +2678,7 @@ static classVariableInfo_t idDeclModelDef_typeInfo[] = {
 	{ "const idDeclSkin *", "skin", (intptr_t)(&((idDeclModelDef *)0)->skin), sizeof( ((idDeclModelDef *)0)->skin ) },
 	{ "bool", "hasCustomRotationSet", (intptr_t)(&((idDeclModelDef *)0)->hasCustomRotationSet), sizeof( ((idDeclModelDef *)0)->hasCustomRotationSet ) },
 	{ "idAngles", "originalRotation", (intptr_t)(&((idDeclModelDef *)0)->originalRotation), sizeof( ((idDeclModelDef *)0)->originalRotation ) },
+	{ "idImportOptions", "importOptions", (intptr_t)(&((idDeclModelDef *)0)->importOptions), sizeof( ((idDeclModelDef *)0)->importOptions ) },
 	{ NULL, 0 }
 };
 
@@ -4617,12 +4617,12 @@ static classVariableInfo_t idWeapon_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static classVariableInfo_t rvmLightStyleState_t_typeInfo[] = {
-	{ "int", "dl_frame", (intptr_t)(&((rvmLightStyleState_t *)0)->dl_frame), sizeof( ((rvmLightStyleState_t *)0)->dl_frame ) },
-	{ "float", "dl_framef", (intptr_t)(&((rvmLightStyleState_t *)0)->dl_framef), sizeof( ((rvmLightStyleState_t *)0)->dl_framef ) },
-	{ "int", "dl_oldframe", (intptr_t)(&((rvmLightStyleState_t *)0)->dl_oldframe), sizeof( ((rvmLightStyleState_t *)0)->dl_oldframe ) },
-	{ "int", "dl_time", (intptr_t)(&((rvmLightStyleState_t *)0)->dl_time), sizeof( ((rvmLightStyleState_t *)0)->dl_time ) },
-	{ "float", "dl_backlerp", (intptr_t)(&((rvmLightStyleState_t *)0)->dl_backlerp), sizeof( ((rvmLightStyleState_t *)0)->dl_backlerp ) },
+static classVariableInfo_t iceLightStyleState_t_typeInfo[] = {
+	{ "int", "dl_frame", (intptr_t)(&((iceLightStyleState_t *)0)->dl_frame), sizeof( ((iceLightStyleState_t *)0)->dl_frame ) },
+	{ "float", "dl_framef", (intptr_t)(&((iceLightStyleState_t *)0)->dl_framef), sizeof( ((iceLightStyleState_t *)0)->dl_framef ) },
+	{ "int", "dl_oldframe", (intptr_t)(&((iceLightStyleState_t *)0)->dl_oldframe), sizeof( ((iceLightStyleState_t *)0)->dl_oldframe ) },
+	{ "int", "dl_time", (intptr_t)(&((iceLightStyleState_t *)0)->dl_time), sizeof( ((iceLightStyleState_t *)0)->dl_time ) },
+	{ "float", "dl_backlerp", (intptr_t)(&((iceLightStyleState_t *)0)->dl_backlerp), sizeof( ((iceLightStyleState_t *)0)->dl_backlerp ) },
 	{ NULL, 0 }
 };
 
@@ -4649,8 +4649,9 @@ static classVariableInfo_t idLight_typeInfo[] = {
 	{ "int", "fadeStart", (intptr_t)(&((idLight *)0)->fadeStart), sizeof( ((idLight *)0)->fadeStart ) },
 	{ "int", "fadeEnd", (intptr_t)(&((idLight *)0)->fadeEnd), sizeof( ((idLight *)0)->fadeEnd ) },
 	{ "bool", "soundWasPlaying", (intptr_t)(&((idLight *)0)->soundWasPlaying), sizeof( ((idLight *)0)->soundWasPlaying ) },
+	{ "idEntityPtr < idStaticEntity >", "modelTarget", (intptr_t)(&((idLight *)0)->modelTarget), sizeof( ((idLight *)0)->modelTarget ) },
 	{ "idList < idStr >", "light_styles", (intptr_t)(&((idLight *)0)->light_styles), sizeof( ((idLight *)0)->light_styles ) },
-	{ "rvmLightStyleState_t", "lightStyleState", (intptr_t)(&((idLight *)0)->lightStyleState), sizeof( ((idLight *)0)->lightStyleState ) },
+	{ "iceLightStyleState_t", "lightStyleState", (intptr_t)(&((idLight *)0)->lightStyleState), sizeof( ((idLight *)0)->lightStyleState ) },
 	{ NULL, 0 }
 };
 
@@ -5034,6 +5035,7 @@ static classVariableInfo_t idPlayer_typeInfo[] = {
 	{ "idScriptBool", "AI_TURN_RIGHT", (intptr_t)(&((idPlayer *)0)->AI_TURN_RIGHT), sizeof( ((idPlayer *)0)->AI_TURN_RIGHT ) },
 	{ "idInventory", "inventory", (intptr_t)(&((idPlayer *)0)->inventory), sizeof( ((idPlayer *)0)->inventory ) },
 	{ "idTarget_SetPrimaryObjective *", "primaryObjective", (intptr_t)(&((idPlayer *)0)->primaryObjective), sizeof( ((idPlayer *)0)->primaryObjective ) },
+	{ "bool", "flashlightReset", (intptr_t)(&((idPlayer *)0)->flashlightReset), sizeof( ((idPlayer *)0)->flashlightReset ) },
 	{ "int", "flashlightBattery", (intptr_t)(&((idPlayer *)0)->flashlightBattery), sizeof( ((idPlayer *)0)->flashlightBattery ) },
 	{ "idEntityPtr < idWeapon >", "flashlight", (intptr_t)(&((idPlayer *)0)->flashlight), sizeof( ((idPlayer *)0)->flashlight ) },
 	{ "idEntityPtr < idWeapon >", "weapon", (intptr_t)(&((idPlayer *)0)->weapon), sizeof( ((idPlayer *)0)->weapon ) },
@@ -6086,10 +6088,10 @@ static classVariableInfo_t iceMonsterZombieCommandoChaingun_typeInfo[] = {
 };
 
 static classVariableInfo_t iceMonster_Turret_typeInfo[] = {
-	{ "boolean", "fire", (intptr_t)(&((iceMonster_Turret *)0)->fire), sizeof( ((iceMonster_Turret *)0)->fire ) },
-	{ "boolean", "attack_monsters", (intptr_t)(&((iceMonster_Turret *)0)->attack_monsters), sizeof( ((iceMonster_Turret *)0)->attack_monsters ) },
+	{ "bool", "fire", (intptr_t)(&((iceMonster_Turret *)0)->fire), sizeof( ((iceMonster_Turret *)0)->fire ) },
+	{ "bool", "attack_monsters", (intptr_t)(&((iceMonster_Turret *)0)->attack_monsters), sizeof( ((iceMonster_Turret *)0)->attack_monsters ) },
 	{ "idEntity", "light", (intptr_t)(&((iceMonster_Turret *)0)->light), sizeof( ((iceMonster_Turret *)0)->light ) },
-	{ "boolean", "light_is_on", (intptr_t)(&((iceMonster_Turret *)0)->light_is_on), sizeof( ((iceMonster_Turret *)0)->light_is_on ) },
+	{ "bool", "light_is_on", (intptr_t)(&((iceMonster_Turret *)0)->light_is_on), sizeof( ((iceMonster_Turret *)0)->light_is_on ) },
 	{ "float", "attackTime", (intptr_t)(&((iceMonster_Turret *)0)->attackTime), sizeof( ((iceMonster_Turret *)0)->attackTime ) },
 	{ "int", "barrelCount", (intptr_t)(&((iceMonster_Turret *)0)->barrelCount), sizeof( ((iceMonster_Turret *)0)->barrelCount ) },
 	{ "int", "currentBarrel", (intptr_t)(&((iceMonster_Turret *)0)->currentBarrel), sizeof( ((iceMonster_Turret *)0)->currentBarrel ) },
@@ -6862,26 +6864,6 @@ static classVariableInfo_t idMenuScreen_Shell_Pause_typeInfo[] = {
 	{ NULL, 0 }
 };
 
-static classVariableInfo_t idMenuScreen_Shell_PressStart_typeInfo[] = {
-	{ ": idMenuWidget_Button *", "startButton", (intptr_t)(&((idMenuScreen_Shell_PressStart *)0)->startButton), sizeof( ((idMenuScreen_Shell_PressStart *)0)->startButton ) },
-	{ "idMenuWidget_DynamicList *", "options", (intptr_t)(&((idMenuScreen_Shell_PressStart *)0)->options), sizeof( ((idMenuScreen_Shell_PressStart *)0)->options ) },
-	{ "idMenuWidget_Carousel *", "itemList", (intptr_t)(&((idMenuScreen_Shell_PressStart *)0)->itemList), sizeof( ((idMenuScreen_Shell_PressStart *)0)->itemList ) },
-	{ "const idMaterial *", "doomCover", (intptr_t)(&((idMenuScreen_Shell_PressStart *)0)->doomCover), sizeof( ((idMenuScreen_Shell_PressStart *)0)->doomCover ) },
-	{ "const idMaterial *", "doom2Cover", (intptr_t)(&((idMenuScreen_Shell_PressStart *)0)->doom2Cover), sizeof( ((idMenuScreen_Shell_PressStart *)0)->doom2Cover ) },
-	{ "const idMaterial *", "doom3Cover", (intptr_t)(&((idMenuScreen_Shell_PressStart *)0)->doom3Cover), sizeof( ((idMenuScreen_Shell_PressStart *)0)->doom3Cover ) },
-	{ NULL, 0 }
-};
-
-static classVariableInfo_t idMenuScreen_Shell_GameSelect_typeInfo[] = {
-	{ ": idMenuWidget_Button *", "startButton", (intptr_t)(&((idMenuScreen_Shell_GameSelect *)0)->startButton), sizeof( ((idMenuScreen_Shell_GameSelect *)0)->startButton ) },
-	{ "idMenuWidget_DynamicList *", "options", (intptr_t)(&((idMenuScreen_Shell_GameSelect *)0)->options), sizeof( ((idMenuScreen_Shell_GameSelect *)0)->options ) },
-	{ "idMenuWidget_Carousel *", "itemList", (intptr_t)(&((idMenuScreen_Shell_GameSelect *)0)->itemList), sizeof( ((idMenuScreen_Shell_GameSelect *)0)->itemList ) },
-	{ "const idMaterial *", "doomCover", (intptr_t)(&((idMenuScreen_Shell_GameSelect *)0)->doomCover), sizeof( ((idMenuScreen_Shell_GameSelect *)0)->doomCover ) },
-	{ "const idMaterial *", "doom2Cover", (intptr_t)(&((idMenuScreen_Shell_GameSelect *)0)->doom2Cover), sizeof( ((idMenuScreen_Shell_GameSelect *)0)->doom2Cover ) },
-	{ "const idMaterial *", "doom3Cover", (intptr_t)(&((idMenuScreen_Shell_GameSelect *)0)->doom3Cover), sizeof( ((idMenuScreen_Shell_GameSelect *)0)->doom3Cover ) },
-	{ NULL, 0 }
-};
-
 static classVariableInfo_t idMenuScreen_Shell_Singleplayer_typeInfo[] = {
 	{ ": bool", "canContinue", (intptr_t)(&((idMenuScreen_Shell_Singleplayer *)0)->canContinue), sizeof( ((idMenuScreen_Shell_Singleplayer *)0)->canContinue ) },
 	{ "idMenuWidget_DynamicList *", "options", (intptr_t)(&((idMenuScreen_Shell_Singleplayer *)0)->options), sizeof( ((idMenuScreen_Shell_Singleplayer *)0)->options ) },
@@ -7089,10 +7071,12 @@ static classVariableInfo_t idMenuScreen_Shell_SystemOptions_idMenuDataSource_Sys
 	{ "int", "originalVsync", (intptr_t)(&((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalVsync), sizeof( ((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalVsync ) },
 	{ "float", "originalBrightness", (intptr_t)(&((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalBrightness), sizeof( ((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalBrightness ) },
 	{ "float", "originalVolume", (intptr_t)(&((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalVolume), sizeof( ((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalVolume ) },
-	{ "int", "originalShadowMapping", (intptr_t)(&((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalShadowMapping), sizeof( ((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalShadowMapping ) },
-	{ "int", "originalSSAO", (intptr_t)(&((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalSSAO), sizeof( ((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalSSAO ) },
-	{ "int", "originalPostProcessing", (intptr_t)(&((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalPostProcessing), sizeof( ((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalPostProcessing ) },
+	{ "int", "originalRenderMode", (intptr_t)(&((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalRenderMode), sizeof( ((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalRenderMode ) },
 	{ "float", "originalAmbientBrightness", (intptr_t)(&((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalAmbientBrightness), sizeof( ((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalAmbientBrightness ) },
+	{ "int", "originalSSAO", (intptr_t)(&((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalSSAO), sizeof( ((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalSSAO ) },
+	{ "int", "originalBloodReflections", (intptr_t)(&((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalBloodReflections), sizeof( ((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalBloodReflections ) },
+	{ "int", "originalPostProcessing", (intptr_t)(&((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalPostProcessing), sizeof( ((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalPostProcessing ) },
+	{ "int", "originalCRTPostFX", (intptr_t)(&((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalCRTPostFX), sizeof( ((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->originalCRTPostFX ) },
 	{ "idList < vidMode_t >", "modeList", (intptr_t)(&((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->modeList), sizeof( ((idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings *)0)->modeList ) },
 	{ NULL, 0 }
 };
@@ -7101,21 +7085,6 @@ static classVariableInfo_t idMenuScreen_Shell_SystemOptions_typeInfo[] = {
 	{ ": idMenuWidget_DynamicList *", "options", (intptr_t)(&((idMenuScreen_Shell_SystemOptions *)0)->options), sizeof( ((idMenuScreen_Shell_SystemOptions *)0)->options ) },
 	{ "idMenuDataSource_SystemSettings", "systemData", (intptr_t)(&((idMenuScreen_Shell_SystemOptions *)0)->systemData), sizeof( ((idMenuScreen_Shell_SystemOptions *)0)->systemData ) },
 	{ "idMenuWidget_Button *", "btnBack", (intptr_t)(&((idMenuScreen_Shell_SystemOptions *)0)->btnBack), sizeof( ((idMenuScreen_Shell_SystemOptions *)0)->btnBack ) },
-	{ NULL, 0 }
-};
-
-static classVariableInfo_t idMenuScreen_Shell_Stereoscopics_idMenuDataSource_StereoSettings_typeInfo[] = {
-	{ ": idStaticList < idSWFScriptVar , MAX_STEREO_FIELDS >", "fields", (intptr_t)(&((idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings *)0)->fields), sizeof( ((idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings *)0)->fields ) },
-	{ "idStaticList < idSWFScriptVar , MAX_STEREO_FIELDS >", "originalFields", (intptr_t)(&((idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings *)0)->originalFields), sizeof( ((idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings *)0)->originalFields ) },
-	{ NULL, 0 }
-};
-
-static classVariableInfo_t idMenuScreen_Shell_Stereoscopics_typeInfo[] = {
-	{ ": idMenuWidget_DynamicList *", "options", (intptr_t)(&((idMenuScreen_Shell_Stereoscopics *)0)->options), sizeof( ((idMenuScreen_Shell_Stereoscopics *)0)->options ) },
-	{ "idMenuDataSource_StereoSettings", "stereoData", (intptr_t)(&((idMenuScreen_Shell_Stereoscopics *)0)->stereoData), sizeof( ((idMenuScreen_Shell_Stereoscopics *)0)->stereoData ) },
-	{ "idMenuWidget_Button *", "btnBack", (intptr_t)(&((idMenuScreen_Shell_Stereoscopics *)0)->btnBack), sizeof( ((idMenuScreen_Shell_Stereoscopics *)0)->btnBack ) },
-	{ "const idMaterial *", "leftEyeMat", (intptr_t)(&((idMenuScreen_Shell_Stereoscopics *)0)->leftEyeMat), sizeof( ((idMenuScreen_Shell_Stereoscopics *)0)->leftEyeMat ) },
-	{ "const idMaterial *", "rightEyeMat", (intptr_t)(&((idMenuScreen_Shell_Stereoscopics *)0)->rightEyeMat), sizeof( ((idMenuScreen_Shell_Stereoscopics *)0)->rightEyeMat ) },
 	{ NULL, 0 }
 };
 
@@ -7608,7 +7577,7 @@ static classTypeInfo_t classTypeInfo[] = {
 	{ "WeaponLight_t", "", sizeof(WeaponLight_t), WeaponLight_t_typeInfo },
 	{ "iceWeaponObject", "idClass", sizeof(iceWeaponObject), iceWeaponObject_typeInfo },
 	{ "idWeapon", "idAnimatedEntity", sizeof(idWeapon), idWeapon_typeInfo },
-	{ "rvmLightStyleState_t", "", sizeof(rvmLightStyleState_t), rvmLightStyleState_t_typeInfo },
+	{ "iceLightStyleState_t", "", sizeof(iceLightStyleState_t), iceLightStyleState_t_typeInfo },
 	{ "idLight", "idEntity", sizeof(idLight), idLight_typeInfo },
 	{ "EnvironmentProbe", "idEntity", sizeof(EnvironmentProbe), EnvironmentProbe_typeInfo },
 	{ "idWorldspawn", "idEntity", sizeof(idWorldspawn), idWorldspawn_typeInfo },
@@ -7826,8 +7795,6 @@ static classTypeInfo_t classTypeInfo[] = {
 	{ "idMenuScreen_PDA_Inventory", "idMenuScreen", sizeof(idMenuScreen_PDA_Inventory), idMenuScreen_PDA_Inventory_typeInfo },
 	{ "idMenuScreen_Shell_Root", "idMenuScreen", sizeof(idMenuScreen_Shell_Root), idMenuScreen_Shell_Root_typeInfo },
 	{ "idMenuScreen_Shell_Pause", "idMenuScreen", sizeof(idMenuScreen_Shell_Pause), idMenuScreen_Shell_Pause_typeInfo },
-	{ "idMenuScreen_Shell_PressStart", "idMenuScreen", sizeof(idMenuScreen_Shell_PressStart), idMenuScreen_Shell_PressStart_typeInfo },
-	{ "idMenuScreen_Shell_GameSelect", "idMenuScreen", sizeof(idMenuScreen_Shell_GameSelect), idMenuScreen_Shell_GameSelect_typeInfo },
 	{ "idMenuScreen_Shell_Singleplayer", "idMenuScreen", sizeof(idMenuScreen_Shell_Singleplayer), idMenuScreen_Shell_Singleplayer_typeInfo },
 	{ "idMenuScreen_Shell_Settings", "idMenuScreen", sizeof(idMenuScreen_Shell_Settings), idMenuScreen_Shell_Settings_typeInfo },
 	{ "creditInfo_t", "", sizeof(creditInfo_t), creditInfo_t_typeInfo },
@@ -7858,8 +7825,6 @@ static classTypeInfo_t classTypeInfo[] = {
 	{ "idMenuScreen_Shell_ControllerLayout", "idMenuScreen", sizeof(idMenuScreen_Shell_ControllerLayout), idMenuScreen_Shell_ControllerLayout_typeInfo },
 	{ "idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings", "idMenuDataSource", sizeof(idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings), idMenuScreen_Shell_SystemOptions_idMenuDataSource_SystemSettings_typeInfo },
 	{ "idMenuScreen_Shell_SystemOptions", "idMenuScreen", sizeof(idMenuScreen_Shell_SystemOptions), idMenuScreen_Shell_SystemOptions_typeInfo },
-	{ "idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings", "idMenuDataSource", sizeof(idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings), idMenuScreen_Shell_Stereoscopics_idMenuDataSource_StereoSettings_typeInfo },
-	{ "idMenuScreen_Shell_Stereoscopics", "idMenuScreen", sizeof(idMenuScreen_Shell_Stereoscopics), idMenuScreen_Shell_Stereoscopics_typeInfo },
 	{ "idMenuScreen_Shell_PartyLobby", "idMenuScreen", sizeof(idMenuScreen_Shell_PartyLobby), idMenuScreen_Shell_PartyLobby_typeInfo },
 	{ "idMenuScreen_Shell_GameLobby", "idMenuScreen", sizeof(idMenuScreen_Shell_GameLobby), idMenuScreen_Shell_GameLobby_typeInfo },
 	{ "idMenuScreen_HUD", "idMenuScreen", sizeof(idMenuScreen_HUD), idMenuScreen_HUD_typeInfo },

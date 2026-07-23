@@ -23,22 +23,9 @@
 #pragma once
 
 
-//#include <donut/core/math/math.h>
 #include <nvrhi/nvrhi.h>
 #include <memory>
 
-/*
-namespace donut::engine
-{
-class ShaderFactory;
-class ShadowMap;
-class FramebufferFactory;
-class ICompositeView;
-}
-
-namespace donut::render
-{
-*/
 class CommonRenderPasses;
 
 enum class TemporalAntiAliasingJitter
@@ -95,7 +82,6 @@ private:
 	nvrhi::BindingLayoutHandle m_MotionVectorsBindingLayout;
 	nvrhi::BindingSetHandle m_MotionVectorsBindingSet;
 	nvrhi::GraphicsPipelineHandle m_MotionVectorsPso;
-	//std::unique_ptr<engine::FramebufferFactory> m_MotionVectorsFramebufferFactory;
 
 	nvrhi::BindingLayoutHandle m_ResolveBindingLayout;
 	nvrhi::BindingSetHandle m_ResolveBindingSet;
@@ -130,12 +116,6 @@ public:
 		const viewDef_t* viewDef,
 		const CreateParameters& params );
 
-	void RenderMotionVectors(
-		nvrhi::ICommandList* commandList,
-		const viewDef_t* viewDef,
-		const viewDef_t* viewDefPrevious,
-		idVec3 preViewTranslationDifference = vec3_zero );
-
 	void TemporalResolve(
 		nvrhi::ICommandList* commandList,
 		const TemporalAntiAliasingParameters& params,
@@ -143,7 +123,7 @@ public:
 		const viewDef_t* viewDef );
 
 	void AdvanceFrame();
-	idVec2 GetCurrentPixelOffset();
+	idVec2 GetCurrentPixelOffset( int frameIndex );
 
 	uint32_t GetFrameIndex() const
 	{

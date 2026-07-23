@@ -40,10 +40,10 @@ struct VS_IN
 	float4 color2	: COLOR1;
 };
 
-struct VS_OUT 
+struct VS_OUT
 {
-	float4 position : POSITION;
-	float4 texcoord0 : TEXCOORD0;
+	float4 position : SV_Position;
+	float4 texcoord0 : TEXCOORD0_centroid;
 	float4 color : COLOR0;
 };
 // *INDENT-ON*
@@ -54,6 +54,8 @@ void main( VS_IN vertex, out VS_OUT result )
 	result.position.y = dot4( vertex.position, rpMVPmatrixY );
 	result.position.z = dot4( vertex.position, rpMVPmatrixZ );
 	result.position.w = dot4( vertex.position, rpMVPmatrixW );
+
+	result.position.xyz = psxVertexJitter( result.position );
 
 	float4 tc0;
 	tc0.x = dot4( vertex.position, rpTexGen0S );

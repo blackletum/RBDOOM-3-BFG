@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013-2023 Robert Beckebans
+Copyright (C) 2013-2024 Robert Beckebans
 Copyright (C) 2022 Stephen Pridham
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
@@ -88,10 +88,10 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 	uniforms.SetNum( RENDERPARM_TOTAL, vec4_zero );
 	uniformsChanged = false;
 
-	for( int i = 0; i < NUM_BINDING_LAYOUTS; i++ )
+	//for( int i = 0; i < NUM_BINDING_LAYOUTS; i++ )
 	{
-		auto constantBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc( uniforms.Allocated(), va( "RenderParams_%d", i ), 16384 );
-		constantBuffer[i] = device->createBuffer( constantBufferDesc );
+		auto constantBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc( uniforms.Allocated(), va( "RenderParams_%d", 1 ), 16384 );
+		constantBuffer = device->createBuffer( constantBufferDesc );
 	}
 
 	// === Main draw vertex layout ===
@@ -327,8 +327,8 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 	auto pp3DBindingLayout = nvrhi::BindingLayoutDesc()
 							 .setVisibility( nvrhi::ShaderType::All )
 							 .addItem( renderParmLayoutItem )
-							 .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 0 ) )	// current render
-							 .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 1 ) )	// normal map
+							 .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 0 ) )		// HDR _currentRender
+							 .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 1 ) )		// normal map
 							 .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 2 ) );	// mask
 
 	bindingLayouts[BINDING_LAYOUT_POST_PROCESS_INGAME] = { device->createBindingLayout( pp3DBindingLayout ), samplerOneBindingLayout };
@@ -336,10 +336,21 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 	auto ppFxBindingLayout = nvrhi::BindingLayoutDesc()
 							 .setVisibility( nvrhi::ShaderType::All )
 							 .addItem( renderParmLayoutItem )
-							 .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 0 ) )
-							 .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 1 ) );
+							 .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 0 ) )		// LDR _currentRender
+							 .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 1 ) );	// _blueNoise
 
 	bindingLayouts[BINDING_LAYOUT_POST_PROCESS_FINAL] = { device->createBindingLayout( ppFxBindingLayout ), samplerTwoBindingLayout };
+	bindingLayouts[BINDING_LAYOUT_POST_PROCESS_CRT] = { device->createBindingLayout( ppFxBindingLayout ), samplerTwoBindingLayout };
+
+	auto ppFxBindingLayout2 = nvrhi::BindingLayoutDesc()
+							  .setVisibility( nvrhi::ShaderType::All )
+							  .addItem( renderParmLayoutItem )
+							  .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 0 ) )	// LDR _currentRender
+							  .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 1 ) )	// _blueNoise
+							  .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 2 ) )	// _currentNormals
+							  .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 3 ) );	// _currentDepth
+
+	bindingLayouts[BINDING_LAYOUT_POST_PROCESS_FINAL2] = { device->createBindingLayout( ppFxBindingLayout2 ), samplerTwoBindingLayout };
 
 	auto normalCubeBindingLayoutDesc = nvrhi::BindingLayoutDesc()
 									   .setVisibility( nvrhi::ShaderType::Pixel )
@@ -357,6 +368,27 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 		skinningLayout, normalCubeBindingLayout, samplerOneBindingLayout
 	};
 
+	auto octahedronCubeBindingLayoutDesc = nvrhi::BindingLayoutDesc()
+										   .setVisibility( nvrhi::ShaderType::Pixel )
+										   .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 0 ) )	// normal map
+										   .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 1 ) )	// HDR _currentRender
+										   .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 2 ) )	// _currentNormals
+										   .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 3 ) )	// _currentDepth
+										   .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 4 ) )	// radiance cube map 1
+										   .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 5 ) )	// radiance cube map 2
+										   .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 6 ) );	// radiance cube map 3
+
+	auto octahedronCubeBindingLayout = device->createBindingLayout( octahedronCubeBindingLayoutDesc );
+
+	bindingLayouts[BINDING_LAYOUT_OCTAHEDRON_CUBE] =
+	{
+		uniformsLayout,  octahedronCubeBindingLayout, samplerTwoBindingLayout
+	};
+	bindingLayouts[BINDING_LAYOUT_OCTAHEDRON_CUBE_SKINNED] =
+	{
+		skinningLayout,  octahedronCubeBindingLayout, samplerTwoBindingLayout
+	};
+
 	auto binkVideoBindingLayout = nvrhi::BindingLayoutDesc()
 								  .setVisibility( nvrhi::ShaderType::All )
 								  .addItem( renderParmLayoutItem )
@@ -365,6 +397,23 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 								  .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 2 ) );	// normal map
 
 	bindingLayouts[BINDING_LAYOUT_BINK_VIDEO] = { device->createBindingLayout( binkVideoBindingLayout ), samplerOneBindingLayout };
+
+	auto smaaEdgeDetectionBindingLayout = nvrhi::BindingLayoutDesc()
+										  .setVisibility( nvrhi::ShaderType::All )
+										  .addItem( renderParmLayoutItem )
+										  .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 0 ) );		// _smaaInput
+	//.addItem( nvrhi::BindingLayoutItem::Texture_SRV( 1 ) )		// _motionVectors
+
+	bindingLayouts[BINDING_LAYOUT_SMAA_EDGE_DETECTION] = { device->createBindingLayout( smaaEdgeDetectionBindingLayout ), samplerTwoBindingLayout };
+
+	auto smaaWeightCalcBindingLayout = nvrhi::BindingLayoutDesc()
+									   .setVisibility( nvrhi::ShaderType::All )
+									   .addItem( renderParmLayoutItem )
+									   .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 0 ) )		// _smaaEdges
+									   .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 1 ) )		// _smaaArea
+									   .addItem( nvrhi::BindingLayoutItem::Texture_SRV( 2 ) );		// _smaaSearch
+
+	bindingLayouts[BINDING_LAYOUT_SMAA_WEIGHT_CALC] = { device->createBindingLayout( smaaWeightCalcBindingLayout ), samplerTwoBindingLayout };
 
 	auto motionVectorsBindingLayout = nvrhi::BindingLayoutDesc()
 									  .setVisibility( nvrhi::ShaderType::All )
@@ -510,6 +559,10 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 		{ BUILTIN_ENVIRONMENT_SKINNED, "builtin/legacy/environment", "_skinned",  { {"USE_GPU_SKINNING", "1" } }, true , SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DEFAULT_SKINNED },
 		{ BUILTIN_BUMPY_ENVIRONMENT, "builtin/legacy/bumpyenvironment", "", { {"USE_GPU_SKINNING", "0" } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_NORMAL_CUBE },
 		{ BUILTIN_BUMPY_ENVIRONMENT_SKINNED, "builtin/legacy/bumpyenvironment", "_skinned", { {"USE_GPU_SKINNING", "1" } }, true, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_NORMAL_CUBE_SKINNED },
+		{ BUILTIN_BUMPY_ENVIRONMENT2, "builtin/legacy/bumpyenvironment2", "", { {"USE_GPU_SKINNING", "0" }, {"USE_SSR", "0" } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_OCTAHEDRON_CUBE },
+		{ BUILTIN_BUMPY_ENVIRONMENT2_SKINNED, "builtin/legacy/bumpyenvironment2", "_skinned", { {"USE_GPU_SKINNING", "1" }, {"USE_SSR", "0" } }, true, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_OCTAHEDRON_CUBE_SKINNED },
+		{ BUILTIN_BUMPY_ENVIRONMENT2_SSR, "builtin/legacy/bumpyenvironment2", "_SSR", { {"USE_GPU_SKINNING", "0" }, {"USE_SSR", "1" } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_OCTAHEDRON_CUBE },
+		{ BUILTIN_BUMPY_ENVIRONMENT2_SSR_SKINNED, "builtin/legacy/bumpyenvironment2", "_SSR_skinned", { {"USE_GPU_SKINNING", "1" }, {"USE_SSR", "1" } }, true, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_OCTAHEDRON_CUBE_SKINNED },
 
 		{ BUILTIN_DEPTH, "builtin/depth", "", { {"USE_GPU_SKINNING", "0" } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_CONSTANT_BUFFER_ONLY },
 		{ BUILTIN_DEPTH_SKINNED, "builtin/depth", "_skinned", { {"USE_GPU_SKINNING", "1" } }, true, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_CONSTANT_BUFFER_ONLY_SKINNED },
@@ -521,6 +574,14 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 		{ BUILTIN_SKYBOX, "builtin/legacy/skybox", "",  {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DEFAULT },
 		{ BUILTIN_WOBBLESKY, "builtin/legacy/wobblesky", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DEFAULT },
 		{ BUILTIN_POSTPROCESS, "builtin/post/postprocess", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_POST_PROCESS_FINAL },
+		{ BUILTIN_POSTPROCESS_RETRO_2BIT, "builtin/post/retro_2bit", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_POST_PROCESS_FINAL },
+		{ BUILTIN_POSTPROCESS_RETRO_C64, "builtin/post/retro_c64", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_POST_PROCESS_FINAL },
+		{ BUILTIN_POSTPROCESS_RETRO_CPC, "builtin/post/retro_cpc", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_POST_PROCESS_FINAL2 },
+		{ BUILTIN_POSTPROCESS_RETRO_GENESIS, "builtin/post/retro_genesis", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_POST_PROCESS_FINAL },
+		{ BUILTIN_POSTPROCESS_RETRO_PSX, "builtin/post/retro_ps1", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_POST_PROCESS_FINAL },
+		{ BUILTIN_CRT_MATTIAS, "builtin/post/crt_mattias", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_POST_PROCESS_CRT },
+		{ BUILTIN_CRT_NUPIXIE, "builtin/post/crt_newpixie", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_POST_PROCESS_CRT },
+		{ BUILTIN_CRT_EASYMODE, "builtin/post/crt_advanced", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_POST_PROCESS_FINAL }, // FINAL for linear filtering
 
 		{ BUILTIN_SCREEN, "builtin/post/screen", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DEFAULT },
 		{ BUILTIN_TONEMAP, "builtin/post/tonemap", "", { { "BRIGHTPASS", "0" }, { "HDR_DEBUG", "0"} }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DEFAULT },
@@ -528,9 +589,9 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 		{ BUILTIN_HDR_GLARE_CHROMATIC, "builtin/post/hdr_glare_chromatic", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DEFAULT },
 		{ BUILTIN_HDR_DEBUG, "builtin/post/tonemap", "_debug", { { "BRIGHTPASS", "0" }, { "HDR_DEBUG", "1"} }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DEFAULT },
 
-		{ BUILTIN_SMAA_EDGE_DETECTION, "builtin/post/SMAA_edge_detection", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DEFAULT },
-		{ BUILTIN_SMAA_BLENDING_WEIGHT_CALCULATION, "builtin/post/SMAA_blending_weight_calc", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DEFAULT },
-		{ BUILTIN_SMAA_NEIGHBORHOOD_BLENDING, "builtin/post/SMAA_final", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DEFAULT },
+		{ BUILTIN_SMAA_EDGE_DETECTION, "builtin/post/SMAA_edge_detection", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_SMAA_EDGE_DETECTION },
+		{ BUILTIN_SMAA_BLENDING_WEIGHT_CALCULATION, "builtin/post/SMAA_blending_weight_calc", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_SMAA_WEIGHT_CALC },
+		{ BUILTIN_SMAA_NEIGHBORHOOD_BLENDING, "builtin/post/SMAA_final", "", {}, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_POST_PROCESS_FINAL },
 
 		{ BUILTIN_MOTION_BLUR, "builtin/post/motionBlur", "_vectors", { { "VECTORS_ONLY", "1" } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_TAA_MOTION_VECTORS },
 		{ BUILTIN_TAA_RESOLVE, "builtin/post/taa", "", { { "SAMPLE_COUNT", "1" }, { "USE_CATMULL_ROM_FILTER", "1" } }, false, SHADER_STAGE_COMPUTE, LAYOUT_UNKNOWN, BINDING_LAYOUT_TAA_RESOLVE },
@@ -618,7 +679,6 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 		}
 	}
 
-	r_usePBR.ClearModified();
 	r_pbrDebug.ClearModified();
 
 	uniforms.SetNum( RENDERPARM_TOTAL, vec4_zero );
@@ -629,6 +689,8 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 		renderProgs[builtinShaders[BUILTIN_INTERACTION_AMBIENT_SKINNED]].usesJoints = true;
 		renderProgs[builtinShaders[BUILTIN_ENVIRONMENT_SKINNED]].usesJoints = true;
 		renderProgs[builtinShaders[BUILTIN_BUMPY_ENVIRONMENT_SKINNED]].usesJoints = true;
+		renderProgs[builtinShaders[BUILTIN_BUMPY_ENVIRONMENT2_SKINNED]].usesJoints = true;
+		renderProgs[builtinShaders[BUILTIN_BUMPY_ENVIRONMENT2_SSR_SKINNED]].usesJoints = true;
 		renderProgs[builtinShaders[BUILTIN_DEPTH_SKINNED]].usesJoints = true;
 		renderProgs[builtinShaders[BUILTIN_FOG_SKINNED]].usesJoints = true;
 
@@ -720,9 +782,9 @@ void idRenderProgManager::Shutdown()
 	}
 
 	// SRS - Unmap buffer memory using overloaded = operator
-	for( int i = 0; i < constantBuffer.Num(); i++ )
+	//for( int i = 0; i < constantBuffer.Num(); i++ )
 	{
-		constantBuffer[i] = nullptr;
+		constantBuffer = nullptr;
 	}
 }
 
@@ -831,11 +893,11 @@ bool idRenderProgManager::IsShaderBound() const
 idRenderProgManager::SetRenderParms
 ================================================================================================
 */
-void idRenderProgManager::SetRenderParms( renderParm_t rp, const float* value, int num )
+void idRenderProgManager::SetRenderParms( renderParm_t rp, const float values[], int num )
 {
 	for( int i = 0; i < num; i++ )
 	{
-		SetRenderParm( ( renderParm_t )( rp + i ), value + ( i * 4 ) );
+		SetRenderParm( ( renderParm_t )( rp + i ), values + ( i * 4 ) );
 	}
 }
 
@@ -844,7 +906,7 @@ void idRenderProgManager::SetRenderParms( renderParm_t rp, const float* value, i
 idRenderProgManager::SetRenderParm
 ================================================================================================
 */
-void idRenderProgManager::SetRenderParm( renderParm_t rp, const float* value )
+void idRenderProgManager::SetRenderParm( renderParm_t rp, const float value[4] )
 {
 	SetUniformValue( rp, value );
 }

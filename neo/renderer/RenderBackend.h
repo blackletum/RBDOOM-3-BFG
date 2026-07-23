@@ -36,19 +36,11 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "Passes/CommonPasses.h"
 #include "Passes/MipMapGenPass.h"
-#include "Passes/FowardShadingPass.h"
 #include "Passes/SsaoPass.h"
 #include "Passes/TonemapPass.h"
 #include "Passes/TemporalAntiAliasingPass.h"
 
 #include "PipelineCache.h"
-
-
-#if USE_OPTICK
-	#define USE_OPTICK_GPU 0
-#else
-	#define USE_OPTICK_GPU 0
-#endif
 
 struct tmu_t
 {
@@ -144,13 +136,10 @@ public:
 	void				StereoRenderExecuteBackEndCommands( const emptyCommand_t* const allCmds );
 	void				GL_BlockingSwapBuffers();
 
-	void				Print();
 	void				CheckCVars();
 
 	void				ClearCaches();
 
-	static void			ImGui_Init();
-	static void			ImGui_Shutdown();
 	static void			ImGui_RenderDrawLists( ImDrawData* draw_data );
 
 	void				DrawElementsWithCounters( const drawSurf_t* surf, bool shadowCounter = false );
@@ -159,9 +148,6 @@ private:
 	void				DrawFlickerBox();
 
 	void				GetCurrentBindingLayout( int bindingLayoutType );
-	void				DrawStencilShadowPass( const drawSurf_t* drawSurf, const bool renderZPass );
-
-	void				SetColorMappings();
 	void				ResizeImages();
 
 	void				DrawViewInternal( const viewDef_t* viewDef, const int stereoEye );
@@ -216,7 +202,9 @@ private:
 
 	// Experimental feature
 	void				MotionBlur();
+
 	void				PostProcess( const void* data );
+	void				CRTPostProcess();
 
 private:
 	void				GL_StartFrame();
@@ -224,7 +212,7 @@ private:
 
 public:
 	uint64				GL_GetCurrentState() const;
-	idVec2				GetCurrentPixelOffset() const;
+	idVec2				GetCurrentPixelOffset( int frameIndex ) const;
 
 	nvrhi::ICommandList* GL_GetCommandList() const
 	{
@@ -245,7 +233,7 @@ private:
 //	void				GL_CopyDepthBuffer( idImage* image, int x, int y, int imageWidth, int imageHeight );
 
 	// RB: HDR parm
-	void				GL_Clear( bool color, bool depth, bool stencil, byte stencilValue, float r, float g, float b, float a, bool clearHDR = false );
+	void				GL_Clear( bool color, bool depth, bool stencil, byte stencilValue, float r, float g, float b, float a, bool clearHDR = false, bool clearVR = false, const int stereoEye = 0 );
 
 	void				GL_DepthBoundsTest( const float zmin, const float zmax );
 	void				GL_PolygonOffset( float scale, float bias );

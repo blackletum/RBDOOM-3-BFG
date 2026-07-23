@@ -50,7 +50,7 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 
 #include "CollisionModel_local.h"
-#include "renderer/Model_gltf.h"
+#include "../renderer/Model_gltf.h"
 
 #define CMODEL_BINARYFILE_EXT	"bcmodel"
 
@@ -3558,11 +3558,15 @@ cm_model_t* idCollisionModelManagerLocal::LoadBinaryModelFromFile( idFile* file,
 	}
 
 	file->ReadBig( model->polygonMemory );
+	// SRS - Boost polygonMemory to handle in-memory (ptr) vs. on-disk (int) size for cm_polygon_t.material, otherwise AllocPolygon() leaks
+	model->polygonMemory += ( sizeof( idMaterial* ) - sizeof( int ) ) * model->numPolygons;
 	model->polygonBlock = ( cm_polygonBlock_t* ) Mem_ClearedAlloc( sizeof( cm_polygonBlock_t ) + model->polygonMemory, TAG_COLLISION );
 	model->polygonBlock->bytesRemaining = model->polygonMemory;
 	model->polygonBlock->next = ( ( byte* ) model->polygonBlock ) + sizeof( cm_polygonBlock_t );
 
 	file->ReadBig( model->brushMemory );
+	// SRS - Boost brushMemory to handle in-memory (ptr) vs. on-disk (int) size for cm_brush_t.material, otherwise AllocBrush() leaks
+	model->brushMemory += ( sizeof( idMaterial* ) - sizeof( int ) ) * model->numBrushes;
 	model->brushBlock = ( cm_brushBlock_t* ) Mem_ClearedAlloc( sizeof( cm_brushBlock_t ) + model->brushMemory, TAG_COLLISION );
 	model->brushBlock->bytesRemaining = model->brushMemory;
 	model->brushBlock->next = ( ( byte* ) model->brushBlock ) + sizeof( cm_brushBlock_t );

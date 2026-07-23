@@ -157,9 +157,6 @@ public:
 	virtual void				UpdateScreen( bool captureToImage, bool releaseMouse = true );
 	// DG end
 	virtual void				UpdateLevelLoadPacifier();  // Indefinate
-//	virtual void				UpdateLevelLoadPacifier( int mProgress );
-//	virtual void				UpdateLevelLoadPacifier( bool Secondary );
-//	virtual void				UpdateLevelLoadPacifier( bool updateSecondary, int mProgress );
 	virtual void				StartupVariable( const char* match );
 	virtual void				InitTool( const toolFlag_t tool, const idDict* dict, idEntity* entity );
 	virtual void				WriteConfigToFile( const char* filename );
@@ -169,6 +166,7 @@ public:
 	virtual void                Printf( VERIFY_FORMAT_STRING const char* fmt, ... ) ID_INSTANCE_ATTRIBUTE_PRINTF( 1, 2 );
 	virtual void				VPrintf( const char* fmt, va_list arg );
 	virtual void                DPrintf( VERIFY_FORMAT_STRING const char* fmt, ... ) ID_INSTANCE_ATTRIBUTE_PRINTF( 1, 2 );
+	virtual void                VerbosePrintf( VERIFY_FORMAT_STRING const char* fmt, ... ) ID_INSTANCE_ATTRIBUTE_PRINTF( 1, 2 );
 	virtual void                Warning( VERIFY_FORMAT_STRING const char* fmt, ... ) ID_INSTANCE_ATTRIBUTE_PRINTF( 1, 2 );
 	virtual void                DWarning( VERIFY_FORMAT_STRING const char* fmt, ... ) ID_INSTANCE_ATTRIBUTE_PRINTF( 1, 2 );
 	virtual void				PrintWarnings();
@@ -206,15 +204,6 @@ public:
 
 	virtual int					ButtonState( int key );
 	virtual int					KeyState( int key );
-
-	virtual idDemoFile* 		ReadDemo()
-	{
-		return readDemo;
-	}
-	virtual idDemoFile* 		WriteDemo()
-	{
-		return writeDemo;
-	}
 
 	virtual idGame* 			Game()
 	{
@@ -317,9 +306,9 @@ public:
 		return time_backend;
 	}
 
-	uint64		GetRendererShadowsMicroseconds() const
+	uint64		GetRendererMaskedOcclusionRasterizationMicroseconds() const
 	{
-		return time_shadows;
+		return time_moc;
 	}
 
 	uint64 	GetRendererIdleMicroseconds() const
@@ -333,9 +322,19 @@ public:
 	}
 
 	// RB begin
+	uint64		GetRendererGpuBeginDrawingMicroseconds() const
+	{
+		return stats_backend.gpuBeginDrawingMicroSec;
+	}
+
 	uint64		GetRendererGpuEarlyZMicroseconds() const
 	{
 		return stats_backend.gpuDepthMicroSec;
+	}
+
+	uint64		GetRendererGpuGeometryMicroseconds() const
+	{
+		return stats_backend.gpuGeometryMicroSec;
 	}
 
 	uint64		GetRendererGpuSSAOMicroseconds() const
@@ -368,41 +367,100 @@ public:
 		return stats_backend.gpuShaderPassMicroSec;
 	}
 
+	uint64		GetRendererGpuFogAllLightsMicroseconds() const
+	{
+		return stats_backend.gpuFogAllLightsMicroSec;
+	}
+
+	uint64		GetRendererGpuBloomMicroseconds() const
+	{
+		return stats_backend.gpuBloomMicroSec;
+	}
+
+	uint64		GetRendererGpuShaderPassPostMicroseconds() const
+	{
+		return stats_backend.gpuShaderPassPostMicroSec;
+	}
+
+	uint64		GetRendererGpuMotionVectorsMicroseconds() const
+	{
+		return stats_backend.gpuMotionVectorsMicroSec;
+	}
+
 	uint64		GetRendererGpuTAAMicroseconds() const
 	{
 		return stats_backend.gpuTemporalAntiAliasingMicroSec;
+	}
+
+	uint64		GetRendererGpuToneMapPassMicroseconds() const
+	{
+		return stats_backend.gpuToneMapPassMicroSec;
 	}
 
 	uint64		GetRendererGpuPostProcessingMicroseconds() const
 	{
 		return stats_backend.gpuPostProcessingMicroSec;
 	}
+
+	uint64		GetRendererGpuDrawGuiMicroseconds() const
+	{
+		return stats_backend.gpuDrawGuiMicroSec;
+	}
+
+	uint64		GetRendererGpuCrtPostProcessingMicroseconds() const
+	{
+		return stats_backend.gpuCrtPostProcessingMicroSec;
+	}
 	// RB end
 
 	// SRS start
-	uint64      GetRendererStartFrameSyncMicroseconds() const
+	void		SetRendererMvkEncodeMicroseconds( uint64 mvkEncodeMicroSeconds )
 	{
-		return mainFrameTiming.finishSyncTime - mainFrameTiming.startSyncTime;
+		metal_encode = mvkEncodeMicroSeconds;
+		return;
 	}
 
-	uint64      GetRendererEndFrameSyncMicroseconds() const
+	uint64		GetRendererMvkEncodeMicroseconds() const
 	{
-		return mainFrameTiming.finishSyncTime_EndFrame - mainFrameTiming.startRenderTime;
+		return metal_encode;
+	}
+
+	void		SetRendererGpuMemoryMB( uint64 gpuMemoryMB )
+	{
+		gpu_memory = gpuMemoryMB;
+		return;
+	}
+
+	uint64		GetRendererGpuMemoryMB() const
+	{
+		return gpu_memory;
 	}
 	// SRS end
+
+	// RB begin
+	virtual void				LoadPacifierInfo( VERIFY_FORMAT_STRING const char* fmt, ... );
+	virtual void				LoadPacifierProgressTotal( int total );
+	virtual void				LoadPacifierProgressIncrement( int step );
+	virtual bool				LoadPacifierRunning();
+	// RB end
 
 	// foresthale 2014-05-30: a special binarize pacifier has to be shown in
 	// some cases, which includes filename and ETA information, note that
 	// the progress function takes 0-1 float, not 0-100, and can be called
 	// very quickly (it will check that enough time has passed when updating)
-	void LoadPacifierBinarizeFilename( const char* filename, const char* reason );
-	void LoadPacifierBinarizeInfo( const char* info );
-	void LoadPacifierBinarizeMiplevel( int level, int maxLevel );
-	void LoadPacifierBinarizeProgress( float progress );
-	void LoadPacifierBinarizeEnd();
+	virtual void				LoadPacifierBinarizeFilename( const char* filename, const char* reason );
+	virtual void				LoadPacifierBinarizeInfo( const char* info );
+	virtual void				LoadPacifierBinarizeMiplevel( int level, int maxLevel );
+	virtual void				LoadPacifierBinarizeProgress( float progress );
+	virtual void				LoadPacifierBinarizeEnd();
 	// for images in particular we can measure more accurately this way (to deal with mipmaps)
-	void LoadPacifierBinarizeProgressTotal( int total );
-	void LoadPacifierBinarizeProgressIncrement( int step );
+	virtual void				LoadPacifierBinarizeProgressTotal( int total );
+	virtual void				LoadPacifierBinarizeProgressIncrement( int step );
+
+	virtual void				DmapPacifierFilename( const char* filename, const char* reason ) {};
+	virtual void				DmapPacifierInfo( VERIFY_FORMAT_STRING const char* fmt, ... ) {};
+	virtual void				DmapPacifierCompileProgressTotal( int total ) {};
+	virtual void				DmapPacifierCompileProgressIncrement( int step ) {};
 
 	frameTiming_t		frameTiming;
 	frameTiming_t		mainFrameTiming;
@@ -417,14 +475,6 @@ public:	// These are public because they are called directly by static functions
 	// loads a map and starts a new game on it
 	void	StartNewGame( const char* mapName, bool devmap, int gameMode );
 	void	LeaveGame();
-
-	void	DemoShot( const char* name );
-	void	StartRecordingRenderDemo( const char* name );
-	void	StopRecordingRenderDemo();
-	void	StartPlayingRenderDemo( idStr name );
-	void	StopPlayingRenderDemo();
-	void	CompressDemoFile( const char* scheme, const char* name );
-	void	TimeRenderDemo( const char* name, bool twice = false, bool quit = false );
 
 	// localization
 	void	InitLanguageDict();
@@ -467,11 +517,6 @@ private:
 	// The main render world and sound world
 	idRenderWorld* 		renderWorld;
 	idSoundWorld* 		soundWorld;
-
-	// The renderer and sound system will write changes to writeDemo.
-	// Demos can be recorded and played at the same time when splicing.
-	idDemoFile* 		readDemo;
-	idDemoFile* 		writeDemo;
 
 	bool				menuActive;
 	idSoundWorld* 		menuSoundWorld;			// so the game soundWorld can be muted
@@ -597,29 +642,42 @@ private:
 	int					time_gameDraw;			// game present time
 	uint64				time_frontend;			// renderer frontend time
 	uint64				time_backend;			// renderer backend time
-	uint64				time_shadows;			// renderer backend waiting for shadow volumes to be created
+	uint64				time_moc;				// renderer frontend masked software rasterization time
 	uint64				time_gpu;				// total gpu time, at least for PC
 
 	// RB: r_speeds counters
 	backEndCounters_t		stats_backend;
 	performanceCounters_t	stats_frontend;
 
+	// SRS - MoltenVK's Vulkan to Metal command buffer encoding time, set default to 0 for non-macOS platforms (Windows and Linux)
+	uint64					metal_encode = 0;
+	// SRS - Cross-platform GPU Memory usage counter, set default to 0 in case platform or graphics API does not support queries
+	uint64					gpu_memory = 0;
+
 	// Used during loading screens
 	int					lastPacifierSessionTime;
 	int					lastPacifierGuiTime;
 	bool				lastPacifierDialogState;
 
+	// RB begin
+	idStrStatic<256>	loadPacifierStatus = "-";
+	int					loadPacifierCount = 0;
+	int					loadPacifierExpectedCount = 0;
+	size_t				loadPacifierTics = 0;
+	size_t				loadPacifierNextTicCount = 0;
+	// RB end
+
 	// foresthale 2014-05-30: a special binarize pacifier has to be shown in some cases, which includes filename and ETA information
-	bool				loadPacifierBinarizeActive;
-	int					loadPacifierBinarizeStartTime;
-	float				loadPacifierBinarizeProgress;
-	float				loadPacifierBinarizeTimeLeft;
+	bool				loadPacifierBinarizeActive = false;
+	int					loadPacifierBinarizeStartTime = 0;
+	float				loadPacifierBinarizeProgress = 0.0f;
+	float				loadPacifierBinarizeTimeLeft = 0.0f;
 	idStr				loadPacifierBinarizeFilename;
 	idStr				loadPacifierBinarizeInfo;
-	int					loadPacifierBinarizeMiplevel;
-	int					loadPacifierBinarizeMiplevelTotal;
-	int					loadPacifierBinarizeProgressTotal;
-	int					loadPacifierBinarizeProgressCurrent;
+	int					loadPacifierBinarizeMiplevel = 0;
+	int					loadPacifierBinarizeMiplevelTotal = 0;
+	int					loadPacifierBinarizeProgressTotal = 0;
+	int					loadPacifierBinarizeProgressCurrent = 0;
 
 	bool				showShellRequested;
 
@@ -633,6 +691,7 @@ private:
 	static const int			DOOMCLASSIC_RENDERHEIGHT = 200 * 3;
 	static const int			DOOMCLASSIC_BYTES_PER_PIXEL = 4;
 	static const int			DOOMCLASSIC_IMAGE_SIZE_IN_BYTES = DOOMCLASSIC_RENDERWIDTH * DOOMCLASSIC_RENDERHEIGHT * DOOMCLASSIC_BYTES_PER_PIXEL;
+	static constexpr float		DOOM_CLASSIC_HZ = 35.0f;
 
 	idArray< byte, DOOMCLASSIC_IMAGE_SIZE_IN_BYTES >	doomClassicImageData;
 #endif
@@ -660,8 +719,6 @@ private:
 
 	void	StartMenu( bool playIntro = false );
 	void	GuiFrameEvents();
-
-	void	AdvanceRenderDemo( bool singleFrameOnly );
 
 	void	ProcessGameReturn( const gameReturn_t& ret );
 
@@ -694,6 +751,7 @@ private:
 
 	// called by Draw when the scene to scene wipe is still running
 	void	DrawWipeModel();
+	void	DrawLoadPacifierProgressbar(); // RB
 	void	StartWipe( const char* materialName, bool hold = false );
 	void	CompleteWipe();
 	void	ClearWipe();

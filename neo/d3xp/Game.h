@@ -188,11 +188,6 @@ public:
 	virtual void				Shell_SetGameComplete() = 0;
 	virtual bool				SkipCinematicScene() = 0;
 	virtual bool				CheckInCinematic() = 0;
-
-	// Demo helper functions
-	virtual void				StartDemoPlayback( idRenderWorld* renderworld ) = 0;
-
-	virtual bool				ProcessDemoCommand( idDemoFile* readDemo ) = 0;
 };
 
 extern idGame* 					game;
@@ -300,6 +295,7 @@ public:
 	virtual void				PlayerGetAxis( idMat3& axis ) const;
 	virtual void				PlayerGetViewAngles( idAngles& angles ) const;
 	virtual void				PlayerGetEyePosition( idVec3& org ) const;
+	virtual bool				PlayerGetRenderView( renderView_t& rv ) const;
 
 	// In game map editing support.
 	virtual const idDict* 		MapGetEntityDict( const char* name ) const;

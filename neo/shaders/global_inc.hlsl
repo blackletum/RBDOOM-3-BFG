@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013-2020 Robert Beckebans
+Copyright (C) 2013-2024 Robert Beckebans
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -107,6 +107,7 @@ cbuffer globals : register( b0 VK_DESCRIPTOR_SET( 0 ) )
 	float4 rpGlobalLightOrigin;
 	float4 rpJitterTexScale;
 	float4 rpJitterTexOffset;
+	float4 rpPSXDistortions;
 	float4 rpCascadeDistances;
 
 	float4 rpShadowMatrices[6 * 4];
@@ -244,6 +245,43 @@ float4 LinearRGBToSRGB( float4 c )
 #endif
 }
 
+float3 HSVToRGB( float3 HSV )
+{
+	float3 RGB = HSV.z;
+
+	float var_h = HSV.x * 6;
+	float var_i = floor( var_h ); // Or ... var_i = floor( var_h )
+	float var_1 = HSV.z * ( 1.0 - HSV.y );
+	float var_2 = HSV.z * ( 1.0 - HSV.y * ( var_h - var_i ) );
+	float var_3 = HSV.z * ( 1.0 - HSV.y * ( 1 - ( var_h - var_i ) ) );
+	if( var_i == 0 )
+	{
+		RGB = float3( HSV.z, var_3, var_1 );
+	}
+	else if( var_i == 1 )
+	{
+		RGB = float3( var_2, HSV.z, var_1 );
+	}
+	else if( var_i == 2 )
+	{
+		RGB = float3( var_1, HSV.z, var_3 );
+	}
+	else if( var_i == 3 )
+	{
+		RGB = float3( var_1, var_2, HSV.z );
+	}
+	else if( var_i == 4 )
+	{
+		RGB = float3( var_3, var_1, HSV.z );
+	}
+	else
+	{
+		RGB = float3( HSV.z, var_1, var_2 );
+	}
+
+	return ( RGB );
+}
+
 /** Efficient GPU implementation of the octahedral unit vector encoding from
 
     Cigolle, Donow, Evangelakos, Mara, McGuire, Meyer,
@@ -366,6 +404,7 @@ float rand( float2 co )
 #define _float3( x )	float3( x, x, x )
 #define _float4( x )	float4( x, x, x, x )
 #define _int2( x )		int2( x, x )
+#define _int3( x )		int3( x, x, x )
 #define vec2			float2
 #define vec3			float3
 #define vec4			float4
@@ -453,8 +492,55 @@ static float2 vposToScreenPosTexCoord( float2 vpos )
 	return vpos.xy * rpWindowCoord.xy;
 }
 
+// ----------------------
+// PSX rendering
+// ----------------------
+
+// a very useful resource with many examples about the PS1 look:
+// https://www.david-colson.com/2021/11/30/ps1-style-renderer.html
+
+// emulate rasterization with fixed point math
+static float3 psxVertexJitter( float4 clipPos )
+{
+	float jitterScale = rpPSXDistortions.x;
+	if( jitterScale > 0.0 )
+	{
+		// snap to vertex to a pixel position on a lower grid
+		float3 vertex = clipPos.xyz / clipPos.w;
+
+		//float2 resolution = float2( 320, 240 ) * ( 1.0 - jitterScale );
+		//float2 resolution = float2( 160, 120 );
+		float2 resolution = float2( rpPSXDistortions.x, rpPSXDistortions.y );
+
+		// depth independent snapping
+		float w = dot4( rpProjectionMatrixW,  float4( vertex.xyz, 1.0 ) );
+		vertex.xy = round( vertex.xy / w * resolution ) / resolution * w;
+
+		//vertex.xy = floor( vertex.xy / 4.0 ) * 4.0;
+		//vertex.xy = round( vertex.xy * resolution ) / resolution;
+		//vertex.xyz = round( vertex.xyz * resolution.x ) / resolution.x;
+
+		vertex *= clipPos.w;
+
+		return vertex;
+	}
+
+	return clipPos.xyz;
+}
+
+static float psxAffineWarp( float distance )
+{
+	return log10( distance ) / 2.0;
+}
+
 #define BRANCH
 #define IFANY
+
+
+// ----------------------
+// Noise tricks
+// ----------------------
+
 
 //note: works for structured patterns too
 // [0;1[
@@ -488,14 +574,103 @@ float InterleavedGradientNoiseAnim( float2 uv, float frameIndex )
 	return rnd;
 }
 
-// RB: very efficient white noise without sine https://www.shadertoy.com/view/4djSRW
-#define HASHSCALE3 float3(443.897, 441.423, 437.195)
-
-float3 Hash33( float3 p3 )
+float R2Noise( float2 uv )
 {
-	p3 = frac( p3 * HASHSCALE3 );
-	p3 += dot( p3, p3.yxz + 19.19 );
-	return frac( ( p3.xxy + p3.yxx ) * p3.zyx );
+	const float a1 = 0.75487766624669276;
+	const float a2 = 0.569840290998;
+
+	return frac( a1 * float( uv.x ) + a2 * float( uv.y ) );
 }
 
-#define SMAA_RT_METRICS float4(1.0 / 1280.0, 1.0 / 720.0, 1280.0, 720.0)
+// array/table version from http://www.anisopteragames.com/how-to-fix-color-banding-with-dithering/
+static const uint ArrayDitherArray8x8[] =
+{
+	0, 32,  8, 40,  2, 34, 10, 42,   /* 8x8 Bayer ordered dithering  */
+	48, 16, 56, 24, 50, 18, 58, 26,  /* pattern.  Each input pixel   */
+	12, 44,  4, 36, 14, 46,  6, 38,  /* is scaled to the 0..63 range */
+	60, 28, 52, 20, 62, 30, 54, 22,  /* before looking in this table */
+	3, 35, 11, 43,  1, 33,  9, 41,   /* to determine the action.     */
+	51, 19, 59, 27, 49, 17, 57, 25,
+	15, 47,  7, 39, 13, 45,  5, 37,
+	63, 31, 55, 23, 61, 29, 53, 21
+};
+
+float DitherArray8x8( float2 pos )
+{
+	uint stippleOffset = ( ( uint )pos.y % 8 ) * 8 + ( ( uint )pos.x % 8 );
+	uint byte = ArrayDitherArray8x8[stippleOffset];
+	float stippleThreshold = byte / 64.0f;
+	return stippleThreshold;
+}
+
+float DitherArray8x8Anim( float2 pos, int frameIndexMod4 )
+{
+	pos += int2( frameIndexMod4 % 2, frameIndexMod4 / 2 ) * uint2( 5, 5 );
+
+	uint stippleOffset = ( ( uint )pos.y % 8 ) * 8 + ( ( uint )pos.x % 8 );
+	uint byte = ArrayDitherArray8x8[stippleOffset];
+	float stippleThreshold = byte / 64.0f;
+	return stippleThreshold;
+}
+
+
+// ----------------------
+// COLLISION DETECTION
+// ----------------------
+
+// RB: TODO OPTIMIZE
+// this is a straight port of idBounds::RayIntersection
+bool AABBRayIntersection( float3 b[2], float3 start, float3 dir, out float scale )
+{
+	int i, ax0, ax1, ax2, side, inside;
+	float f;
+	float3 hit;
+
+	ax0 = -1;
+	inside = 0;
+	for( i = 0; i < 3; i++ )
+	{
+		if( start[i] < b[0][i] )
+		{
+			side = 0;
+		}
+		else if( start[i] > b[1][i] )
+		{
+			side = 1;
+		}
+		else
+		{
+			inside++;
+			continue;
+		}
+		if( dir[i] == 0.0f )
+		{
+			continue;
+		}
+
+		f = ( start[i] - b[side][i] );
+
+		if( ax0 < 0 || abs( f ) > abs( scale * dir[i] ) )
+		{
+			scale = - ( f / dir[i] );
+			ax0 = i;
+		}
+	}
+
+	if( ax0 < 0 )
+	{
+		scale = 0.0f;
+
+		// return true if the start point is inside the bounds
+		return ( inside == 3 );
+	}
+
+	ax1 = ( ax0 + 1 ) % 3;
+	ax2 = ( ax0 + 2 ) % 3;
+	hit[ax1] = start[ax1] + scale * dir[ax1];
+	hit[ax2] = start[ax2] + scale * dir[ax2];
+
+	return ( hit[ax1] >= b[0][ax1] && hit[ax1] <= b[1][ax1] &&
+			 hit[ax2] >= b[0][ax2] && hit[ax2] <= b[1][ax2] );
+}
+

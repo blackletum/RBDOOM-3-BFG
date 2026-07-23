@@ -29,6 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "../../../renderer/RenderCommon.h"
 
+// DMAP TODO
+#define DMAP_INLINE_MODELS 1
 
 typedef struct primitive_s
 {
@@ -275,8 +277,6 @@ typedef struct
 	int			entityNum;
 
 	idList<mapLight_t*>	mapLights;
-
-	bool	verbose;
 
 	bool	glview;
 	bool	asciiTree;			// BSP tree visualization in the .proc file

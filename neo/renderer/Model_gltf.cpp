@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 2022-2023 Harrie van Ginneken
-Copyright (C) 2022-2023 Robert Beckebans
+Copyright (C) 2022-2025 Robert Beckebans
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -36,16 +36,20 @@ If you have questions concerning this license or the applicable additional terms
 #include "RenderCommon.h"
 
 // HVG_TODO: this has to be moved out before release
-#include "d3xp/anim/Anim.h"
-#include "d3xp/Game_local.h"
+#if !defined( DMAP )
+	#include "d3xp/anim/Anim.h"
+	#include "d3xp/Game_local.h"
+#endif
 
-idCVar gltf_ForceBspMeshTexture( "gltf_ForceBspMeshTexture", "0", CVAR_SYSTEM | CVAR_BOOL, "all world geometry has the same forced texture" );
-idCVar gltf_ModelSceneName( "gltf_ModelSceneName", "Scene", CVAR_SYSTEM , "Scene to use when loading specific models" );
+idCVar r_useCachedDynamicModels( "r_useCachedDynamicModels", "1", CVAR_RENDERER | CVAR_BOOL, "cache snapshots of dynamic models" );
 
-idCVar gltf_AnimSampleRate( "gltf_AnimSampleRate", "24", CVAR_SYSTEM | CVAR_INTEGER , "The frame rate of the converted md5anim" );
+idCVar gltf_forceBspMeshTexture( "gltf_forceBspMeshTexture", "0", CVAR_SYSTEM | CVAR_BOOL, "all world geometry has the same forced texture" );
+idCVar gltf_modelSceneName( "gltf_modelSceneName", "Scene", CVAR_SYSTEM | CVAR_NEW, "Scene to use when loading specific models" );
+
+idCVar gltf_animSampleRate( "gltf_animSampleRate", "24", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NEW, "The frame rate of the converted md5anim" );
 
 
-static const byte GLMB_VERSION = 102;
+static const byte GLMB_VERSION = 106;
 static const unsigned int GLMB_MAGIC = ( 'M' << 24 ) | ( 'L' << 16 ) | ( 'G' << 8 ) | GLMB_VERSION;
 static const char* GLTF_SnapshotName = "_GLTF_Snapshot_";
 static const idMat4 blenderToDoomTransform( idAngles( 0.0f, 0.0f, 90 ).ToMat3(), vec3_origin );
@@ -82,7 +86,7 @@ void idRenderModelGLTF::ProcessNode_r( gltfNode* modelNode, const idMat4& parent
 			{
 				mat = data->MaterialList()[prim->material];
 			}
-			if( mat != NULL && !gltf_ForceBspMeshTexture.GetBool() )
+			if( mat != NULL && !gltf_forceBspMeshTexture.GetBool() )
 			{
 				surf.shader = declManager->FindMaterial( mat->name );
 			}
@@ -461,7 +465,7 @@ static gltfNode* FindModelRoot( gltfData* data, const idImportOptions* options, 
 }
 
 // constructs a renderModel from a gltfScene node found in the "models" scene of the given gltfFile.
-// override with gltf_ModelSceneName
+// override with gltf_modelSceneName
 // warning : nodeName cannot have dots!
 // [fileName].[nodeName/nodeId].[gltf/glb]
 // If no nodeName/nodeId is given, all primitives active in default scene will be added as surfaces.
@@ -486,6 +490,8 @@ void idRenderModelGLTF::InitFromFile( const char* fileName, const idImportOption
 	if( options )
 	{
 		commandLine = options->commandLine;
+		declModelDefName = options->modelDefName;
+		declTimeStamp = options->declSourceTimeStamp;
 		localOptions = const_cast<idImportOptions*>( options );
 	}
 	else
@@ -741,13 +747,13 @@ void idRenderModelGLTF::InitFromFile( const char* fileName, const idImportOption
 	}
 }
 
-bool idRenderModelGLTF::LoadBinaryModel( idFile* file, const ID_TIME_T sourceTimeStamp )
+bool idRenderModelGLTF::LoadBinaryModel( idFile* file, const ID_TIME_T sourceTimeStamp, const ID_TIME_T declSourceTimeStamp )
 {
 	hasAnimations = false;
 	fileExclusive = false; // not written.
 	root = nullptr;
 
-	if( !idRenderModelStatic::LoadBinaryModel( file, sourceTimeStamp ) )
+	if( !idRenderModelStatic::LoadBinaryModel( file, sourceTimeStamp, declSourceTimeStamp ) )
 	{
 		data = nullptr;
 		return false;
@@ -762,6 +768,14 @@ bool idRenderModelGLTF::LoadBinaryModel( idFile* file, const ID_TIME_T sourceTim
 		return false;
 	}
 
+	// RB: trigger reimport if modelDef .def file changed
+	file->ReadBig( declTimeStamp );
+	if( !fileSystem->InProductionMode() && ( declSourceTimeStamp != FILE_NOT_FOUND_TIMESTAMP ) && ( declSourceTimeStamp != 0 ) && ( declSourceTimeStamp != declTimeStamp ) )
+	{
+		return false;
+	}
+
+	file->ReadString( declModelDefName );
 	file->ReadString( commandLine );
 	file->ReadBig( model_state );
 	file->ReadBig( rootID );
@@ -875,6 +889,7 @@ void idRenderModelGLTF::UpdateMd5Joints()
 
 void idRenderModelGLTF::DrawJoints( const struct renderEntity_s* ent, const viewDef_t* view )
 {
+#if !defined( DMAP )
 	int					i;
 	int					num;
 	idVec3				pos;
@@ -918,78 +933,7 @@ void idRenderModelGLTF::DrawJoints( const struct renderEntity_s* ent, const view
 			common->RW()->DrawText( md5joints[i].name, pos + offset, scale, colorWhite, view->renderView.viewaxis, 1 );
 		}
 	}
-}
-
-static bool GatherBoneInfo( gltfData* data, gltfAnimation* gltfAnim, idList<int, TAG_MODEL>& bones, idList<jointAnimInfo_t, TAG_MD5_ANIM>& jointInfo , gltfSkin* skin,  const idImportOptions* options )
-{
-	bool boneLess = false;
-	int targetNode = lastMeshFromFile->GetRootID();
-
-	auto targets = data->GetAnimTargets( gltfAnim );
-	auto& nodeList = data->NodeList();
-	if( skin == nullptr )
-	{
-		boneLess = true;
-	}
-
-	// we cant be sure channels are sorted by bone?
-	if( !boneLess )
-	{
-		if( skin == nullptr )
-		{
-			skin = data->GetSkin( targetNode );
-		}
-		assert( skin );
-
-		// armature node is origin/root bone
-		//bones.Append( skin->skeleton );
-
-		// skeleton bones
-		bones.Append( skin->joints );
-	}
-	else
-	{
-		bones.Append( targetNode );
-	}
-
-	if( options )
-	{
-		if( options->keepjoints.Num() )
-		{
-			KeepNodes( data, options->keepjoints, bones );
-		}
-
-		if( options->addOrigin )
-		{
-			gltfNode* armatureNode = data->NodeList()[bones[0]]->parent;
-			AddOriginBone( data, bones, armatureNode );
-		}
-
-		if( options->remapjoints.Num() )
-		{
-			RemapNodes( data, options->remapjoints, bones );
-		}
-
-		if( options->renamejoints.Num() )
-		{
-			RenameNodes( data, options->renamejoints, bones );
-		}
-	}
-
-	// create jointInfo
-	jointInfo.SetGranularity( 1 );
-	jointInfo.SetNum( bones.Num() );
-	int idx = 0;
-	for( auto& joint : jointInfo )
-	{
-		joint.animBits = ~63;
-		joint.firstComponent = -1;
-
-		const char* name = nodeList[bones[idx++]]->name.c_str();
-		joint.nameIndex = animationLib.JointIndex( name );
-	}
-
-	return boneLess;
+#endif
 }
 
 static idList<idJointQuat> GetPose( idList<gltfNode>& bones, idJointMat* poseMat, const idMat4& globalTransform )
@@ -1071,6 +1015,80 @@ static int CopyBones( gltfData* data, const idList<int>& bones, idList<gltfNode>
 	return out.Num();
 }
 
+#if !defined( DMAP )
+
+static bool GatherBoneInfo( gltfData* data, gltfAnimation* gltfAnim, idList<int, TAG_MODEL>& bones, idList<jointAnimInfo_t, TAG_MD5_ANIM>& jointInfo , gltfSkin* skin,  const idImportOptions* options )
+{
+	bool boneLess = false;
+	int targetNode = lastMeshFromFile->GetRootID();
+
+	auto targets = data->GetAnimTargets( gltfAnim );
+	auto& nodeList = data->NodeList();
+	if( skin == nullptr )
+	{
+		boneLess = true;
+	}
+
+	// we cant be sure channels are sorted by bone?
+	if( !boneLess )
+	{
+		if( skin == nullptr )
+		{
+			skin = data->GetSkin( targetNode );
+		}
+		assert( skin );
+
+		// armature node is origin/root bone
+		//bones.Append( skin->skeleton );
+
+		// skeleton bones
+		bones.Append( skin->joints );
+	}
+	else
+	{
+		bones.Append( targetNode );
+	}
+
+	if( options )
+	{
+		if( options->keepjoints.Num() )
+		{
+			KeepNodes( data, options->keepjoints, bones );
+		}
+
+		if( options->addOrigin )
+		{
+			gltfNode* armatureNode = data->NodeList()[bones[0]]->parent;
+			AddOriginBone( data, bones, armatureNode );
+		}
+
+		if( options->remapjoints.Num() )
+		{
+			RemapNodes( data, options->remapjoints, bones );
+		}
+
+		if( options->renamejoints.Num() )
+		{
+			RenameNodes( data, options->renamejoints, bones );
+		}
+	}
+
+	// create jointInfo
+	jointInfo.SetGranularity( 1 );
+	jointInfo.SetNum( bones.Num() );
+	int idx = 0;
+	for( auto& joint : jointInfo )
+	{
+		joint.animBits = ~63;
+		joint.firstComponent = -1;
+
+		const char* name = nodeList[bones[idx++]]->name.c_str();
+		joint.nameIndex = animationLib.JointIndex( name );
+	}
+
+	return boneLess;
+}
+
 idFile_Memory* idRenderModelGLTF::GetAnimBin( const idStr& animName, const ID_TIME_T sourceTimeStamp, const idImportOptions* options )
 {
 	assert( lastMeshFromFile );
@@ -1131,7 +1149,7 @@ idFile_Memory* idRenderModelGLTF::GetAnimBin( const idStr& animName, const ID_TI
 	int										numJoints = bones.Num();
 	int										numAnimatedComponents = 0;
 
-	gameLocal.Printf( "Generating MD5Anim for GLTF anim %s from scene %s\n", name.c_str(), gltf_ModelSceneName.GetString() );
+	gameLocal.Printf( "Generating MD5Anim for GLTF anim %s from scene %s\n", name.c_str(), gltf_modelSceneName.GetString() );
 
 	idMat4 globalTransform = blenderToDoomTransform;
 
@@ -1287,7 +1305,7 @@ idFile_Memory* idRenderModelGLTF::GetAnimBin( const idStr& animName, const ID_TI
 	// we can calculate frame rate by:
 	// max_timestamp_value / totalFrames
 	// but keeping it fixed for now.
-	frameRate = gltf_AnimSampleRate.GetInteger();
+	frameRate = gltf_animSampleRate.GetInteger();
 	int animLength = ( ( numFrames - 1 ) * 1000 + frameRate - 1 ) / frameRate;
 
 #if 0
@@ -1620,6 +1638,8 @@ idFile_Memory* idRenderModelGLTF::GetAnimBin( const idStr& animName, const ID_TI
 	return file;
 }
 
+#endif // #if !defined( DMAP )
+
 void idRenderModelGLTF::WriteBinaryModel( idFile* file, ID_TIME_T* _timeStamp /*= NULL */ ) const
 {
 	idRenderModelStatic::WriteBinaryModel( file , _timeStamp );
@@ -1630,6 +1650,8 @@ void idRenderModelGLTF::WriteBinaryModel( idFile* file, ID_TIME_T* _timeStamp /*
 	}
 
 	file->WriteBig( GLMB_MAGIC );
+	file->WriteBig( declTimeStamp );
+	file->WriteString( declModelDefName );
 	file->WriteString( commandLine );
 	file->WriteBig( model_state );
 	file->WriteBig( rootID );
@@ -1680,6 +1702,7 @@ void idRenderModelGLTF::WriteBinaryModel( idFile* file, ID_TIME_T* _timeStamp /*
 void idRenderModelGLTF::PurgeModel()
 {
 	idRenderModelStatic::PurgeModel();
+
 	purged = true;
 	md5joints.Clear();
 	defaultPose.Clear();
@@ -1881,6 +1904,7 @@ void idRenderModelGLTF::UpdateSurface( const struct renderEntity_s* ent, const i
 
 	idList<int> jointIds;
 
+#if !defined( DMAP )
 	if( r_useGPUSkinning.GetBool() )
 	{
 		if( tri->verts != NULL && tri->verts != verts )
@@ -1892,6 +1916,7 @@ void idRenderModelGLTF::UpdateSurface( const struct renderEntity_s* ent, const i
 		tri->referencedVerts = true;
 	}
 	else
+#endif
 	{
 		if( tri->verts == NULL || tri->verts == verts )
 		{
@@ -1942,13 +1967,13 @@ void idRenderModelGLTF::UpdateSurface( const struct renderEntity_s* ent, const i
 	_mm_store_ss( tri->bounds.ToFloatPtr() + 5, _mm_splat_ps( maxZ, 3 ) );
 
 #else
-	bounds.Clear();
-	for( int i = 0; i < jointIds.Num(); i++ )
+	tri->bounds.Clear();
+	for( int i = 0; i < md5joints.Num(); i++ )
 	{
 		const idJointMat& joint = entJoints[i];
-		bounds.AddPoint( joint.GetTranslation() );
+		tri->bounds.AddPoint( joint.GetTranslation() );
 	}
-	bounds.ExpandSelf( maxJointVertDist );
+	tri->bounds.ExpandSelf( maxJointVertDist );
 
 #endif
 
@@ -2058,6 +2083,9 @@ static void TransformJointsFast( idJointMat* __restrict outJoints, const int num
 
 idRenderModel* idRenderModelGLTF::InstantiateDynamicModel( const struct renderEntity_s* ent, const viewDef_t* view, idRenderModel* cachedModel )
 {
+#if defined( DMAP )
+	return NULL;
+#else
 	if( cachedModel != NULL && !r_useCachedDynamicModels.GetBool() )
 	{
 		delete cachedModel;
@@ -2099,6 +2127,7 @@ idRenderModel* idRenderModelGLTF::InstantiateDynamicModel( const struct renderEn
 
 	staticModel->bounds.Clear();
 
+#if !defined( DMAP )
 	if( r_showSkel.GetInteger() )
 	{
 		if( ( view != NULL ) && ( !r_skipSuppress.GetBool() || !ent->suppressSurfaceInViewID || ( ent->suppressSurfaceInViewID != view->renderView.viewID ) ) )
@@ -2114,6 +2143,7 @@ idRenderModel* idRenderModelGLTF::InstantiateDynamicModel( const struct renderEn
 			return staticModel;
 		}
 	}
+#endif
 
 	// update the GPU joints array
 	const int numInvertedJoints = SIMD_ROUND_JOINTS( md5joints.Num() );
@@ -2160,6 +2190,7 @@ idRenderModel* idRenderModelGLTF::InstantiateDynamicModel( const struct renderEn
 	}
 
 	return staticModel;
+#endif
 }
 
 int idRenderModelGLTF::NumJoints() const

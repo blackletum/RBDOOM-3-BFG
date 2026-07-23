@@ -274,4 +274,8 @@ extern idCVar g_CTFArrows;
 
 extern idCVar	net_clientSelfSmoothing;
 
+// RB: new game mode vars
+extern idCVar ng_classicFlashlight;
+// RB end
+
 #endif /* !__SYS_CVAR_H__ */

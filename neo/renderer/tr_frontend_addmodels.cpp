@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2014-2016 Robert Beckebans
+Copyright (C) 2014-2024 Robert Beckebans
 Copyright (C) 2014-2016 Kot in Action Creative Artel
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
@@ -30,13 +30,21 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
+#if defined(USE_INTRINSICS_SSE)
+	#if MOC_MULTITHREADED
+		#include "CullingThreadPool.h"
+	#else
+		#include "../libs/moc/MaskedOcclusionCulling.h"
+	#endif
+#endif
+
 #include "RenderCommon.h"
 #include "Model_local.h"
 
 idCVar r_skipStaticShadows( "r_skipStaticShadows", "0", CVAR_RENDERER | CVAR_BOOL, "skip static shadows" );
 idCVar r_skipDynamicShadows( "r_skipDynamicShadows", "0", CVAR_RENDERER | CVAR_BOOL, "skip dynamic shadows" );
-idCVar r_useParallelAddModels( "r_useParallelAddModels", "1", CVAR_RENDERER | CVAR_BOOL, "add all models in parallel with jobs" );
-idCVar r_useParallelAddShadows( "r_useParallelAddShadows", "1", CVAR_RENDERER | CVAR_INTEGER, "0 = off, 1 = threaded", 0, 1 );
+idCVar r_useParallelAddModels( "r_useParallelAddModels", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_NOCHEAT, "add all models in parallel with jobs" );
+idCVar r_useParallelAddShadows( "r_useParallelAddShadows", "1", CVAR_RENDERER | CVAR_INTEGER | CVAR_NOCHEAT, "0 = off, 1 = threaded", 0, 1 );
 idCVar r_forceShadowCaps( "r_forceShadowCaps", "0", CVAR_RENDERER | CVAR_BOOL, "0 = skip rendering shadow caps if view is outside shadow volume, 1 = always render shadow caps" );
 // RB begin
 idCVar r_forceShadowMapsOnAlphaTestedSurfaces( "r_forceShadowMapsOnAlphaTestedSurfaces", "1", CVAR_RENDERER | CVAR_BOOL, "0 = same shadowing as with stencil shadows, 1 = ignore noshadows for alpha tested materials" );
@@ -46,64 +54,7 @@ idCVar r_lodMaterialDistance( "r_lodMaterialDistance", "500", CVAR_RENDERER | CV
 
 static const float CHECK_BOUNDS_EPSILON = 1.0f;
 
-/*
-==================
-R_SortViewEntities
-==================
-*/
-viewEntity_t* R_SortViewEntities( viewEntity_t* vEntities )
-{
-	SCOPED_PROFILE_EVENT( "R_SortViewEntities" );
 
-	// We want to avoid having a single AddModel for something complex be
-	// the last thing processed and hurt the parallel occupancy, so
-	// sort dynamic models first, _area models second, then everything else.
-	viewEntity_t* dynamics = NULL;
-	viewEntity_t* areas = NULL;
-	viewEntity_t* others = NULL;
-	for( viewEntity_t* vEntity = vEntities; vEntity != NULL; )
-	{
-		viewEntity_t* next = vEntity->next;
-		const idRenderModel* model = vEntity->entityDef->parms.hModel;
-		if( model->IsDynamicModel() != DM_STATIC )
-		{
-			vEntity->next = dynamics;
-			dynamics = vEntity;
-		}
-		else if( model->IsStaticWorldModel() )
-		{
-			vEntity->next = areas;
-			areas = vEntity;
-		}
-		else
-		{
-			vEntity->next = others;
-			others = vEntity;
-		}
-		vEntity = next;
-	}
-
-	// concatenate the lists
-	viewEntity_t* all = others;
-
-	for( viewEntity_t* vEntity = areas; vEntity != NULL; )
-	{
-		viewEntity_t* next = vEntity->next;
-		vEntity->next = all;
-		all = vEntity;
-		vEntity = next;
-	}
-
-	for( viewEntity_t* vEntity = dynamics; vEntity != NULL; )
-	{
-		viewEntity_t* next = vEntity->next;
-		vEntity->next = all;
-		all = vEntity;
-		vEntity = next;
-	}
-
-	return all;
-}
 
 /*
 ==================
@@ -139,8 +90,6 @@ R_IssueEntityDefCallback
 bool R_IssueEntityDefCallback( idRenderEntityLocal* def )
 {
 	idBounds oldBounds = def->localReferenceBounds;
-
-	def->archived = false;		// will need to be written to the demo file
 
 	bool update;
 	if( tr.viewDef != NULL )
@@ -228,7 +177,6 @@ idRenderModel* R_EntityDefDynamicModel( idRenderEntityLocal* def )
 	// if we don't have a snapshot of the dynamic model, generate it now
 	if( def->dynamicModel == NULL )
 	{
-
 		SCOPED_PROFILE_EVENT( "InstantiateDynamicModel" );
 
 		// instantiate the snapshot of the dynamic model, possibly reusing memory from the cached snapshot
@@ -366,9 +314,6 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 {
 	// we will add all interaction surfs here, to be chained to the lights in later serial code
 	vEntity->drawSurfs = NULL;
-
-	// RB
-	vEntity->useLightGrid = false;
 
 	// globals we really should pass in...
 	const viewDef_t* viewDef = tr.viewDef;
@@ -546,32 +491,6 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 		}
 	}
 
-	// RB: use first valid lightgrid
-	for( areaReference_t* ref = entityDef->entityRefs; ref != NULL; ref = ref->ownerNext )
-	{
-		idImage* lightGridImage = ref->area->lightGrid.GetIrradianceImage();
-
-		if( ref->area->lightGrid.lightGridPoints.Num() && lightGridImage && !lightGridImage->IsDefaulted() )
-		{
-			vEntity->useLightGrid = true;
-			vEntity->lightGridAtlasImage = lightGridImage;
-			vEntity->lightGridAtlasSingleProbeSize = ref->area->lightGrid.imageSingleProbeSize;
-			vEntity->lightGridAtlasBorderSize = ref->area->lightGrid.imageBorderSize;
-
-			for( int i = 0; i < 3; i++ )
-			{
-				vEntity->lightGridOrigin[i] = ref->area->lightGrid.lightGridOrigin[i];
-				vEntity->lightGridSize[i] = ref->area->lightGrid.lightGridSize[i];
-				vEntity->lightGridBounds[i] = ref->area->lightGrid.lightGridBounds[i];
-			}
-
-			break;
-		}
-	}
-
-
-	// RB end
-
 	//---------------------------
 	// copy matrix related stuff for back-end use
 	// and setup a render matrix for faster culling
@@ -586,6 +505,7 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 	idRenderMatrix viewMat;
 	idRenderMatrix::Transpose( *( idRenderMatrix* )vEntity->modelViewMatrix, viewMat );
 	idRenderMatrix::Multiply( viewDef->projectionRenderMatrix, viewMat, vEntity->mvp );
+	idRenderMatrix::Multiply( viewDef->unjitteredProjectionRenderMatrix, viewMat, vEntity->unjitteredMVP );
 	if( renderEntity->weaponDepthHack )
 	{
 		idRenderMatrix::ApplyDepthHack( vEntity->mvp );
@@ -726,11 +646,86 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 		// than the entire entity reference bounds
 		// If the entire model wasn't visible, there is no need to check the
 		// individual surfaces.
-		const bool surfaceDirectlyVisible = modelIsVisible && !idRenderMatrix::CullBoundsToMVP( vEntity->mvp, tri->bounds );
+		bool surfaceDirectlyVisible = modelIsVisible && !idRenderMatrix::CullBoundsToMVP( vEntity->mvp, tri->bounds );
 
 		// RB: added check wether GPU skinning is available at all
 		const bool gpuSkinned = ( tri->staticModelWithJoints != NULL && r_useGPUSkinning.GetBool() );
-		// RB end
+
+		//const char* shaderName = shader->GetName();
+		//if( idStr::Cmp( shaderName, "textures/rock/sharprock_dark") == 0 )
+		//{
+		//	tr.pc.c_mocTests += 0;
+		//}
+
+#if defined(USE_INTRINSICS_SSE)
+
+		const bool viewInsideSurface = tri->bounds.ContainsPoint( localViewOrigin );
+
+		//if( viewInsideSurface && idStr::Cmp( shaderName, "models/weapons/berserk/fist") != 0 )
+		//{
+		//	tr.pc.c_mocTests += 1;
+		//
+		//	tr.viewDef->renderWorld->DebugBounds( colorCyan, tri->bounds, renderEntity->origin );
+		//}
+
+		// RB: test surface visibility by drawing the triangles of the bounds
+		if( r_useMaskedOcclusionCulling.GetBool() && !viewInsideSurface && !viewDef->isMirror && !viewDef->isSubview )
+		{
+			if( //!model->IsStaticWorldModel() &&
+				!renderEntity->weaponDepthHack && renderEntity->modelDepthHack == 0.0f )
+			{
+				idVec4 triVerts[8];
+
+				tr.pc.c_mocIndexes += 36;
+				tr.pc.c_mocVerts += 8;
+
+				idBounds surfaceBounds;
+#if 1
+				if( gpuSkinned )
+				{
+					surfaceBounds = vEntity->entityDef->localReferenceBounds;
+				}
+				else
+#endif
+				{
+					surfaceBounds = tri->bounds;
+				}
+
+				idRenderMatrix modelRenderMatrix;
+				idRenderMatrix::CreateFromOriginAxis( renderEntity->origin, renderEntity->axis, modelRenderMatrix );
+
+				idRenderMatrix inverseBaseModelProject;
+				idRenderMatrix::OffsetScaleForBounds( modelRenderMatrix, surfaceBounds, inverseBaseModelProject );
+
+				idRenderMatrix invProjectMVPMatrix;
+				idRenderMatrix::Multiply( viewDef->worldSpace.unjitteredMVP, inverseBaseModelProject, invProjectMVPMatrix );
+
+				tr.pc.c_mocTests += 1;
+
+				// NOTE: unit cube instead of zeroToOne cube
+				idVec4* verts = tr.maskedUnitCubeVerts;
+				for( int i = 0; i < 8; i++ )
+				{
+					// transform to clip space
+					invProjectMVPMatrix.TransformPoint( verts[i], triVerts[i] );
+				}
+
+
+				// backface none so objects are still visible where we run into
+#if MOC_MULTITHREADED
+				tr.maskedOcclusionThreaded->SetMatrix( NULL );
+				MaskedOcclusionCulling::CullingResult result = tr.maskedOcclusionThreaded->TestTriangles( ( float* )triVerts, tr.maskedZeroOneCubeIndexes, 12, MaskedOcclusionCulling::BACKFACE_NONE );
+#else
+				MaskedOcclusionCulling::CullingResult result = tr.maskedOcclusionCulling->TestTriangles( ( float* )triVerts, tr.maskedZeroOneCubeIndexes, 12, NULL, MaskedOcclusionCulling::BACKFACE_NONE );
+#endif
+				if( result != MaskedOcclusionCulling::VISIBLE )
+				{
+					tr.pc.c_mocCulledSurfaces += 1;
+					surfaceDirectlyVisible = false;
+				}
+			}
+		}
+#endif // #if defined(USE_INTRINSICS_SSE)
 
 		//--------------------------
 		// base drawing surface
@@ -814,6 +809,99 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 				baseDrawSurf->linkChain = NULL;		// link to the view
 				baseDrawSurf->nextOnLight = vEntity->drawSurfs;
 				vEntity->drawSurfs = baseDrawSurf;
+			}
+
+			// RB: use area the surface is in because a model can span multiple areas #965
+			baseDrawSurf->area = NULL;
+
+			if( shader->ReceivesLighting() )
+			{
+				idVec3 surfaceCenter;
+				idVec3 triCenter = tri->bounds.GetCenter();
+
+				idRenderMatrix modelRenderMatrix;
+				idRenderMatrix::CreateFromOriginAxis( renderEntity->origin, renderEntity->axis, modelRenderMatrix );
+				modelRenderMatrix.TransformPoint( triCenter, surfaceCenter );
+
+				int surfaceArea = tr.primaryWorld->PointInArea( surfaceCenter );
+
+				for( areaReference_t* ref = entityDef->entityRefs; ref != NULL; ref = ref->ownerNext )
+				{
+					idImage* lightGridImage = ref->area->lightGrid.GetIrradianceImage();
+
+					if( surfaceArea == ref->area->areaNum && ref->area->lightGrid.lightGridPoints.Num() && lightGridImage != NULL && !lightGridImage->IsDefaulted() )
+					{
+						baseDrawSurf->area = ref->area;
+						break;
+					}
+				}
+
+				// RB: use first valid lightgrid
+				// this would be wrong but less wrong than a flickering env_probe fallback
+				if( baseDrawSurf->area == NULL )
+				{
+					for( areaReference_t* ref = entityDef->entityRefs; ref != NULL; ref = ref->ownerNext )
+					{
+						idImage* lightGridImage = ref->area->lightGrid.GetIrradianceImage();
+
+						if( ref->area->lightGrid.lightGridPoints.Num() && lightGridImage != NULL && !lightGridImage->IsDefaulted() )
+						{
+							baseDrawSurf->area = ref->area;
+							break;
+						}
+					}
+				}
+
+#if 0
+				// show which area the surface is coming from
+				//if( baseDrawSurf->area == NULL )
+				{
+					idBounds surfaceBounds;
+					if( gpuSkinned )
+					{
+						surfaceBounds = vEntity->entityDef->localReferenceBounds;
+					}
+					else
+					{
+						surfaceBounds = tri->bounds;
+					}
+
+					idRenderMatrix modelRenderMatrix;
+					idRenderMatrix::CreateFromOriginAxis( renderEntity->origin, renderEntity->axis, modelRenderMatrix );
+
+					idRenderMatrix inverseBaseModelProject;
+					idRenderMatrix::OffsetScaleForBounds( modelRenderMatrix, surfaceBounds, inverseBaseModelProject );
+
+					// NOTE: unit cube instead of zeroToOne cube
+					idVec4* verts = tr.maskedUnitCubeVerts;
+					idVec4 triVerts[8];
+
+					for( int i = 0; i < 8; i++ )
+					{
+						// transform to clip space
+						inverseBaseModelProject.TransformPoint( verts[i], triVerts[i] );
+					}
+
+					static idVec4 colors[] = { colorBrown, colorBlue, colorCyan, colorGreen, colorYellow, colorRed, colorWhite };
+					idVec4 color = colors[surfaceArea & 7];
+
+					if( baseDrawSurf->area == NULL )
+					{
+						color = colorPurple;
+					}
+
+					// same as idRenderWorldLocal::DebugBox
+					const int lifetime = 0;
+					for( int i = 0; i < 4; i++ )
+					{
+						tr.viewDef->renderWorld->DebugLine( color, triVerts[i].ToVec3(), triVerts[( i + 1 ) & 3].ToVec3(), lifetime );
+						tr.viewDef->renderWorld->DebugLine( color, triVerts[4 + i].ToVec3(), triVerts[4 + ( ( i + 1 ) & 3 )].ToVec3(), lifetime );
+						tr.viewDef->renderWorld->DebugLine( color, triVerts[i].ToVec3(), triVerts[4 + i].ToVec3(), lifetime );
+					}
+
+					tr.viewDef->renderWorld->DebugAxis( surfaceCenter, renderEntity->axis );
+				}
+#endif
 			}
 		}
 
@@ -1117,7 +1205,8 @@ void R_AddModels()
 {
 	SCOPED_PROFILE_EVENT( "R_AddModels" );
 
-	tr.viewDef->viewEntitys = R_SortViewEntities( tr.viewDef->viewEntitys );
+	// RB: already done in R_FillMaskedOcclusionBufferWithModels
+	// tr.viewDef->viewEntitys = R_SortViewEntities( tr.viewDef->viewEntitys );
 
 	//-------------------------------------------------
 	// Go through each view entity that is either visible to the view, or to

@@ -196,7 +196,7 @@ void AfEditor::Draw()
 
 	if( ImGui::Begin( "AF Editor", &showTool, ImGuiWindowFlags_MenuBar ) )
 	{
-		impl::SetReleaseToolMouse( true );
+		SetReleaseToolMouse( true );
 
 		bool changedAf = false;
 		bool openedAfBrowser = false;
@@ -253,7 +253,7 @@ void AfEditor::Draw()
 				fileSystem->FreeFileList( files );
 			}
 
-			ImGui::ListBoxHeader( "##afFileSelect" );
+			ImGui::BeginListBox( "##afFileSelect" );
 			for( int i = 0; i < afFiles.Num(); i++ )
 			{
 				if( ImGui::ListBox( "Files", &fileSelection, StringListItemGetter, &afFiles, afFiles.Num() ) )
@@ -261,7 +261,7 @@ void AfEditor::Draw()
 					fileName = afFiles[fileSelection];
 				}
 			}
-			ImGui::ListBoxFooter();
+			ImGui::EndListBox();
 
 			ImGui::SameLine();
 			ImGui::SmallButton( "New File" );
@@ -571,7 +571,7 @@ void AfEditor::Draw()
 	{
 		// TODO: do the same as when pressing cancel?
 		isShown = showTool;
-		impl::SetReleaseToolMouse( false );
+		SetReleaseToolMouse( false );
 	}
 }
 

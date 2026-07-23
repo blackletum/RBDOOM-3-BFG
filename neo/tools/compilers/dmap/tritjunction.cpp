@@ -540,11 +540,8 @@ void	FixAreaGroupsTjunctions( optimizeGroup_t* groupList )
 
 	startCount = CountGroupListTris( groupList );
 
-	if( dmapGlobals.verbose )
-	{
-		common->Printf( "----- FixAreaGroupsTjunctions -----\n" );
-		common->Printf( "%6i triangles in\n", startCount );
-	}
+	common->VerbosePrintf( "----- FixAreaGroupsTjunctions -----\n" );
+	common->VerbosePrintf( "%6i triangles in\n", startCount );
 
 	HashTriangles( groupList );
 
@@ -567,10 +564,7 @@ void	FixAreaGroupsTjunctions( optimizeGroup_t* groupList )
 	}
 
 	endCount = CountGroupListTris( groupList );
-	if( dmapGlobals.verbose )
-	{
-		common->Printf( "%6i triangles out\n", endCount );
-	}
+	common->VerbosePrintf( "%6i triangles out\n", endCount );
 }
 
 
@@ -603,7 +597,7 @@ void	FixGlobalTjunctions( uEntity_t* e )
 	optimizeGroup_t*	group;
 	int			areaNum;
 
-	common->Printf( "----- FixGlobalTjunctions -----\n" );
+	common->VerbosePrintf( "----- FixGlobalTjunctions -----\n" );
 
 	// clear the hash tables
 	memset( hashVerts, 0, sizeof( hashVerts ) );
@@ -662,6 +656,7 @@ void	FixGlobalTjunctions( uEntity_t* e )
 		}
 	}
 
+#if DMAP_INLINE_MODELS
 	// add all the func_static model vertexes to the hash buckets
 	// optionally inline some of the func_static models
 	if( dmapGlobals.entityNum == 0 )
@@ -674,14 +669,23 @@ void	FixGlobalTjunctions( uEntity_t* e )
 			{
 				continue;
 			}
-			const char* modelName = entity->mapEntity->epairs.GetString( "model" );
-			if( !modelName )
+			idStrStatic< MAX_OSPATH > modelName = entity->mapEntity->epairs.GetString( "model" );
+			if( modelName.IsEmpty() )
 			{
 				continue;
 			}
 
-			// RB: DAE and OBJ support
-			if( !strstr( modelName, ".lwo" ) && !strstr( modelName, ".ase" ) && !strstr( modelName, ".ma" ) && !strstr( modelName, ".dae" ) && !strstr( modelName, ".obj" ) )
+			idStrStatic< MAX_OSPATH > extension;
+			modelName.ExtractFileExtension( extension );
+
+			// RB: glTF2 and OBJ support
+			bool isGLTF = false;
+			if( ( extension.Icmp( GLTF_GLB_EXT ) == 0 ) || ( extension.Icmp( GLTF_EXT ) == 0 ) )
+			{
+				isGLTF = true;
+			}
+
+			if( !isGLTF && !strstr( modelName, ".lwo" ) && !strstr( modelName, ".ase" ) && !strstr( modelName, ".ma" ) && !strstr( modelName, ".obj" ) )
 			{
 				continue;
 			}
@@ -728,8 +732,7 @@ void	FixGlobalTjunctions( uEntity_t* e )
 			}
 		}
 	}
-
-
+#endif
 
 	// now fix each area
 	for( areaNum = 0 ; areaNum < e->numAreas ; areaNum++ )

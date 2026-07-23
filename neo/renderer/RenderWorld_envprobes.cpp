@@ -1,9 +1,9 @@
-﻿/*
+/*
 ===========================================================================
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2020-2021 Robert Beckebans
+Copyright (C) 2020-2025 Robert Beckebans
 Copyright (C) 2022 Stephen Pridham
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
@@ -921,7 +921,7 @@ void R_MakeAmbientMap( const char* baseName, byte* buffers[6], const char* suffi
 	}
 }
 
-CONSOLE_COMMAND( bakeEnvironmentProbes, "Bake environment probes", NULL )
+CONSOLE_COMMAND_SHIP( bakeEnvironmentProbes, "Bake environment probes", NULL )
 {
 	idStr			fullname;
 	idStr			baseName;
@@ -938,6 +938,40 @@ CONSOLE_COMMAND( bakeEnvironmentProbes, "Bake environment probes", NULL )
 	int sysHeight = renderSystem->GetHeight();
 
 	bool useThreads = true;
+	int numThreads = JOBLIST_PARALLELISM_MAX_CORES;
+
+	bool helpRequested = false;
+	idStr option;
+
+	for( int i = 1; i < args.Argc(); i++ )
+	{
+		option = args.Argv( i );
+		option.StripLeading( '-' );
+
+		if( option.IcmpPrefix( "mt" ) == 0 )
+		{
+			option.StripLeading( "mt" );
+			int threads = atoi( option );
+			if( threads > 0 )
+			{
+				int maxCores = parallelJobManager->GetLogicalCpuCores();
+				numThreads = idMath::ClampInt( 1, maxCores, threads );
+			}
+		}
+		else if( option.Icmp( "h" ) == 0 || option.Icmp( "help" ) == 0 )
+		{
+			helpRequested = true;
+			break;
+		}
+	}
+
+	if( helpRequested )
+	{
+		idLib::Printf( "USAGE: bakeEnvironmentProbes [<switches>...]\n\n" );
+		idLib::Printf( "<Switches>\n" );
+		idLib::Printf( " mt[num] : number of threads used for baking (default max logical cores)\n" );
+		return;
+	}
 
 	baseName = tr.primaryWorld->mapName;
 	baseName.StripFileExtension();
@@ -959,8 +993,13 @@ CONSOLE_COMMAND( bakeEnvironmentProbes, "Bake environment probes", NULL )
 	// make sure the game / draw thread has completed
 	commonLocal.WaitGameThread();
 
-	//glConfig.nativeScreenWidth = captureSize;
-	//glConfig.nativeScreenHeight = captureSize;
+	// turn vsync off for faster capturing of the probes
+	int oldVsync = r_swapInterval.GetInteger();
+	r_swapInterval.SetInteger( 0 );
+
+	// turn off clear in between views so we keep the progress bar visible
+	int oldClear = r_clear.GetInteger();
+	r_clear.SetInteger( 0 );
 
 	// disable scissor, so we don't need to adjust all those rects
 	r_useScissor.SetBool( false );
@@ -1022,6 +1061,10 @@ CONSOLE_COMMAND( bakeEnvironmentProbes, "Bake environment probes", NULL )
 
 		byte* buffers[6];
 
+		int areaNum = tr.primaryWorld->PointInArea( def->parms.origin );
+		idVec3 point = def->parms.origin;
+		point.SnapInt();
+
 		for( int j = 0; j < 6; j++ )
 		{
 			ref = primary.renderView;
@@ -1049,12 +1092,23 @@ CONSOLE_COMMAND( bakeEnvironmentProbes, "Bake environment probes", NULL )
 
 			byte* floatRGB16F = NULL;
 
-			R_ReadPixelsRGB16F( deviceManager->GetDevice(), &tr.backend.GetCommonPasses(), globalImages->envprobeHDRImage->GetTextureHandle() , nvrhi::ResourceStates::RenderTarget, &floatRGB16F, captureSize, captureSize );
+			//if( point.x == 0 && point.y == 64 && point.z == 56 && j == 1 )
+			//{
+			//	floatRGB16F = NULL;
+			//}
+
+			//bool validCapture =
+			R_ReadPixelsRGB16F( deviceManager->GetDevice(), &tr.backend.GetCommonPasses(), globalImages->envprobeHDRImage->GetTextureHandle(), nvrhi::ResourceStates::RenderTarget, &floatRGB16F, captureSize, captureSize );
 
 #if 0
 			idStr testName;
-			testName.Format( "env/test/envprobe_%i_side_%i.exr", i, j );
+			testName.Format( "env/test/%s/area%i_envprobe_%i_%i_%i_side_%i.exr", baseName.c_str(), areaNum, int( point.x ), int( point.y ), int( point.z ), j );
 			R_WriteEXR( testName, floatRGB16F, 3, captureSize, captureSize, "fs_basepath" );
+
+			if( !validCapture )
+			{
+				common->Printf( "failed to capture side %s\n", testName.c_str() );
+			}
 #endif
 			buffers[ j ] = floatRGB16F;
 		}
@@ -1062,10 +1116,6 @@ CONSOLE_COMMAND( bakeEnvironmentProbes, "Bake environment probes", NULL )
 		tr.takingEnvprobe = false;
 		progressBar.Increment( true );
 		tr.takingEnvprobe = true;
-
-		int areaNum = tr.primaryWorld->PointInArea( def->parms.origin );
-		idVec3 point = def->parms.origin;
-		point.SnapInt();
 
 		fullname.Format( "%s/area%i_envprobe_%i_%i_%i", baseName.c_str(), areaNum, int( point.x ), int( point.y ), int( point.z ) );
 		fullname.ReplaceChar( '-', '_' );
@@ -1093,7 +1143,7 @@ CONSOLE_COMMAND( bakeEnvironmentProbes, "Bake environment probes", NULL )
 		common->UpdateScreen( false );
 
 		//tr.envprobeJobList->Submit();
-		tr.envprobeJobList->Submit( NULL, JOBLIST_PARALLELISM_MAX_CORES );
+		tr.envprobeJobList->Submit( NULL, numThreads );
 		tr.envprobeJobList->Wait();
 	}
 
@@ -1114,6 +1164,16 @@ CONSOLE_COMMAND( bakeEnvironmentProbes, "Bake environment probes", NULL )
 					Mem_Free( job->radiance[i] );
 				}
 			}
+		}
+
+		// generate .bimage file
+		if( job->outHeight == RADIANCE_OCTAHEDRON_SIZE )
+		{
+			globalImages->ImageFromFile( job->filename, TF_DEFAULT, TR_CLAMP, TD_HDR_LIGHTPROBE, CF_2D_PACKED_MIPCHAIN );
+		}
+		else
+		{
+			globalImages->ImageFromFile( job->filename, TF_LINEAR, TR_CLAMP, TD_HDR_LIGHTPROBE, CF_2D_PACKED_MIPCHAIN );
 		}
 
 		Mem_Free( job->outBuffer );
@@ -1143,12 +1203,18 @@ CONSOLE_COMMAND( bakeEnvironmentProbes, "Bake environment probes", NULL )
 		def->radianceImage->Reload( true, commandList );
 	}
 
+	globalImages->LoadDeferredImages( commandList );
+
 	commandList->close();
 	deviceManager->GetDevice()->executeCommandList( commandList );
 
 	idLib::Printf( "----------------------------------\n" );
 	idLib::Printf( "Processed %i light probes\n", totalProcessedProbes );
-	common->Printf( "Baked SH irradiance and GGX mip maps in %5.1f seconds\n\n", ( totalEnd - totalStart ) / ( 1000.0f ) );
+	common->Printf( "Baked SH irradiance and GGX mip maps in %5.1f minutes\n\n", ( totalEnd - totalStart ) / ( 1000.0f * 60 ) );
+
+	// restore vsync setting
+	r_swapInterval.SetInteger( oldVsync );
+	r_clear.SetInteger( oldClear );
 }
 
 CONSOLE_COMMAND( makeBrdfLUT, "make a GGX BRDF lookup table", NULL )
@@ -1213,7 +1279,7 @@ CONSOLE_COMMAND( makeBrdfLUT, "make a GGX BRDF lookup table", NULL )
 	idStr fullname = "env/_brdfLut.png";
 	idLib::Printf( "writing %s\n", fullname.c_str() );
 
-	R_WritePNG( fullname, ldrBuffer, 4, outSize, outSize, true, "fs_basepath" );
+	R_WritePNG( fullname, ldrBuffer, 4, outSize, outSize, "fs_basepath" );
 	//R_WriteEXR( "env/_brdfLut.exr", hdrBuffer, 4, outSize, outSize, "fs_basepath" );
 
 
@@ -1264,89 +1330,4 @@ static const unsigned char brfLutTexBytes[] =
 	Mem_Free( hdrBuffer );
 }
 
-CONSOLE_COMMAND( makeImageHeader, "load an image and turn it into a .h file", NULL )
-{
-	byte*		buffer;
-	int			width = 0, height = 0;
 
-	if( args.Argc() < 2 )
-	{
-		common->Printf( "USAGE: makeImageHeader filename [exportname]\n" );
-		return;
-	}
-
-	idStr filename = args.Argv( 1 );
-
-	R_LoadImage( filename, &buffer, &width, &height, NULL, true, NULL );
-	if( !buffer )
-	{
-		common->Printf( "loading %s failed.\n", filename.c_str() );
-		return;
-	}
-
-	filename.StripFileExtension();
-
-	idStr exportname;
-
-	if( args.Argc() == 3 )
-	{
-		exportname.Format( "Image_%s.h", args.Argv( 2 ) );
-	}
-	else
-	{
-		exportname.Format( "Image_%s.h", filename.c_str() );
-	}
-
-	for( int i = 0; i < exportname.Length(); i++ )
-	{
-		if( exportname[ i ] == '/' )
-		{
-			exportname[ i ] = '_';
-		}
-	}
-
-	idFileLocal headerFile( fileSystem->OpenFileWrite( exportname, "fs_basepath" ) );
-
-	idStr uppername = exportname;
-	uppername.ToUpper();
-
-	for( int i = 0; i < uppername.Length(); i++ )
-	{
-		if( uppername[ i ] == '.' )
-		{
-			uppername[ i ] = '_';
-		}
-	}
-
-	headerFile->Printf( "#ifndef %s_TEX_H\n", uppername.c_str() );
-	headerFile->Printf( "#define %s_TEX_H\n\n", uppername.c_str() );
-
-	headerFile->Printf( "#define %s_TEX_WIDTH %i\n", uppername.c_str(), width );
-	headerFile->Printf( "#define %s_TEX_HEIGHT %i\n\n", uppername.c_str(), height );
-
-	headerFile->Printf( "static const unsigned char %s_Bytes[] = {\n", uppername.c_str() );
-
-	int bufferSize = width * height * 4;
-
-	for( int i = 0; i < bufferSize; i++ )
-	{
-		byte b = buffer[i];
-
-		if( i < ( bufferSize - 1 ) )
-		{
-			headerFile->Printf( "0x%02hhx, ", b );
-		}
-		else
-		{
-			headerFile->Printf( "0x%02hhx", b );
-		}
-
-		if( i % 12 == 0 )
-		{
-			headerFile->Printf( "\n" );
-		}
-	}
-	headerFile->Printf( "\n};\n#endif\n" );
-
-	Mem_Free( buffer );
-}

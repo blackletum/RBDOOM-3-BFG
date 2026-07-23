@@ -4,7 +4,8 @@
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
 Copyright (C) 2022 Stephen Pridham
-Copyright (C) 2022 Robert Beckebans
+Copyright (C) 2022-2023 Harrie van Ginneken
+Copyright (C) 2022-2025 Robert Beckebans
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -30,20 +31,23 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "precompiled.h"
 #pragma hdrstop
+
 #include "Model_gltf.h"
 #include "Model_local.h"
 #include "RenderCommon.h"	// just for R_FreeWorldInteractions and R_CreateWorldInteractions
 
-#include <sys/DeviceManager.h>
+#if !defined( DMAP )
+	#include <sys/DeviceManager.h>
+	extern DeviceManager* deviceManager;
+#endif
 
-extern DeviceManager* deviceManager;
-extern idCVar r_uploadBufferSizeMB;
+extern idCVar r_vkUploadBufferSizeMB;
 
-idCVar binaryLoadRenderModels( "binaryLoadRenderModels", "1", 0, "enable binary load/write of render models" );
+idCVar binaryLoadRenderModels( "binaryLoadRenderModels", "1", CVAR_NEW, "enable binary load/write of render models" );
 idCVar preload_MapModels( "preload_MapModels", "1", CVAR_SYSTEM | CVAR_BOOL, "preload models during begin or end levelload" );
 
 // RB begin
-idCVar postLoadExportModels( "postLoadExportModels", "0", CVAR_BOOL | CVAR_RENDERER, "export models after loading to OBJ model format" );
+idCVar postLoadExportModels( "postLoadExportModels", "0", CVAR_BOOL | CVAR_RENDERER | CVAR_NEW, "export models after loading to OBJ model format" );
 // RB end
 
 class idRenderModelManagerLocal : public idRenderModelManager
@@ -228,7 +232,7 @@ void idRenderModelManagerLocal::WritePrecacheCommands( idFile* f )
 		}
 
 		char	str[1024];
-		sprintf( str, "touchModel %s\n", model->Name() );
+		idStr::snPrintf( str, sizeof( str ), "touchModel %s\n", model->Name() );
 		common->Printf( "%s", str );
 		f->Printf( "%s", str );
 	}
@@ -241,17 +245,20 @@ idRenderModelManagerLocal::Init
 */
 void idRenderModelManagerLocal::Init()
 {
+#if !defined( DMAP )
 	if( !commandList )
 	{
 		nvrhi::CommandListParameters params = {};
+		params.enableImmediateExecution = false;
 		if( deviceManager->GetGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN )
 		{
 			// SRS - set upload buffer size to avoid Vulkan staging buffer fragmentation
-			size_t maxBufferSize = ( size_t )( r_uploadBufferSizeMB.GetInteger() * 1024 * 1024 );
+			size_t maxBufferSize = ( size_t )( r_vkUploadBufferSizeMB.GetInteger() * 1024 * 1024 );
 			params.setUploadChunkSize( maxBufferSize );
 		}
 		commandList = deviceManager->GetDevice()->createCommandList( params );
 	}
+#endif
 
 	cmdSystem->AddCommand( "listModels", ListModels_f, CMD_FL_RENDERER, "lists all models" );
 	cmdSystem->AddCommand( "printModel", PrintModel_f, CMD_FL_RENDERER, "prints model info", idCmdSystem::ArgCompletion_ModelName );
@@ -268,6 +275,7 @@ void idRenderModelManagerLocal::Init()
 	defaultModel = model;
 	AddModel( model );
 
+#if !defined( DMAP )
 	// create the beam model
 	idRenderModelStatic* beam = new( TAG_MODEL ) idRenderModelBeam;
 	beam->InitEmpty( "_BEAM" );
@@ -280,6 +288,7 @@ void idRenderModelManagerLocal::Init()
 	sprite->SetLevelLoadReferenced( true );
 	spriteModel = sprite;
 	AddModel( sprite );
+#endif
 }
 
 /*
@@ -356,7 +365,15 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 				{
 					idFileLocal file( fileSystem->OpenFileReadMemory( generatedFileName ) );
 					model->PurgeModel();
-					if( !model->LoadBinaryModel( file, sourceTimeStamp ) )
+
+					// RB: .bglb also stores the timestamp of the modelDef .def file so changing the modelDef will trigger a reimport
+					ID_TIME_T declSourceTimeStamp = 0;
+					if( options != NULL )
+					{
+						declSourceTimeStamp = options->declSourceTimeStamp;
+					}
+
+					if( !model->LoadBinaryModel( file, sourceTimeStamp, declSourceTimeStamp ) )
 					{
 						if( isGLTF )
 						{
@@ -398,13 +415,14 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 		model = new( TAG_MODEL ) idRenderModelGLTF;
 		isGLTF = true;
 	}
-	// RB: Collada DAE and Wavefront OBJ
-	else if( ( extension.Icmp( "dae" ) == 0 ) || ( extension.Icmp( "obj" ) == 0 )
+	// RB: Wavefront OBJ
+	else if( ( extension.Icmp( "obj" ) == 0 )
 			 || ( extension.Icmp( "ase" ) == 0 ) || ( extension.Icmp( "lwo" ) == 0 )
 			 || ( extension.Icmp( "flt" ) == 0 ) || ( extension.Icmp( "ma" ) == 0 ) )
 	{
 		model = new( TAG_MODEL ) idRenderModelStatic;
 	}
+#if !defined( DMAP )
 	else if( extension.Icmp( MD5_MESH_EXT ) == 0 )
 	{
 		model = new( TAG_MODEL ) idRenderModelMD5;
@@ -421,6 +439,7 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 	{
 		model = new( TAG_MODEL ) idRenderModelLiquid;
 	}
+#endif
 
 	idStrStatic< MAX_OSPATH > generatedFileName;
 
@@ -455,7 +474,19 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 		}
 		else
 		{
-			if( !model->LoadBinaryModel( file, sourceTimeStamp ) )
+			if( options != NULL )
+			{
+				idLib::Printf( "Trying to load with options %s\n", generatedFileName.c_str() );
+			}
+
+			// RB: .bglb also stores the timestamp of the modelDef .def file so changing the modelDef will trigger a reimport
+			ID_TIME_T declSourceTimeStamp = 0;
+			if( options != NULL )
+			{
+				declSourceTimeStamp = options->declSourceTimeStamp;
+			}
+
+			if( !model->LoadBinaryModel( file, sourceTimeStamp, declSourceTimeStamp ) )
 			{
 				model->InitFromFile( canonical, options );
 
@@ -476,7 +507,6 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 	// Not one of the known formats
 	if( model == NULL )
 	{
-
 		if( extension.Length() )
 		{
 			common->Warning( "unknown model type '%s'", canonical.c_str() );
@@ -514,6 +544,7 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 	}
 
 	// RB begin
+#if !defined( DMAP )
 	if( postLoadExportModels.GetBool() && ( model != defaultModel && model != beamModel && model != spriteModel ) )
 	{
 		idStrStatic< MAX_OSPATH > exportedFileName;
@@ -544,6 +575,7 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 			model->ExportOBJ( objFile, mtlFile );
 		}
 	}
+#endif
 	// RB end
 
 	AddModel( model );
@@ -658,8 +690,11 @@ void idRenderModelManagerLocal::RemoveModel( idRenderModel* model )
 idRenderModelManagerLocal::ReloadModels
 =================
 */
+#include "../d3xp/anim/Anim.h" // RB: required for idDeclModelDef
+
 void idRenderModelManagerLocal::ReloadModels( bool forceAll )
 {
+#if !defined( DMAP )
 	if( forceAll )
 	{
 		common->Printf( "Reloading all model files...\n" );
@@ -688,6 +723,8 @@ void idRenderModelManagerLocal::ReloadModels( bool forceAll )
 		idStr assetName = filename;
 		assetName.ExtractFileExtension( extension );
 		isGLTF = extension.Icmp( "glb" ) == 0 || extension.Icmp( "gltf" ) == 0;
+		const idDeclModelDef* modelDef = NULL;
+
 		if( !forceAll )
 		{
 			// check timestamp
@@ -700,30 +737,53 @@ void idRenderModelManagerLocal::ReloadModels( bool forceAll )
 				gltfManager::ExtractIdentifier( filename, meshID, meshName );
 			}
 
-			fileSystem->ReadFile( filename, NULL, &current );
-			if( current <= model->Timestamp() )
+			const char* modelDefName = model->GetModelDefName();
+			if( idStr::Cmp( modelDefName, "" ) != 0 )
 			{
-				continue;
+				modelDef = static_cast<const idDeclModelDef*>( declManager->FindType( DECL_MODELDEF, modelDefName, false ) );
+				if( modelDef != NULL )
+				{
+					ID_TIME_T defCurrent = modelDef->GetSourceFileTimestamp();
+
+					fileSystem->ReadFile( filename, NULL, &current );
+					if( current <= model->Timestamp() && defCurrent <= model->DeclTimestamp() )
+					{
+						continue;
+					}
+				}
 			}
+			else
+			{
+				fileSystem->ReadFile( filename, NULL, &current );
+				if( current <= model->Timestamp() )
+				{
+					continue;
+				}
+			}
+		}
+
+		const idImportOptions* options = NULL;
+		if( modelDef != NULL )
+		{
+			options = modelDef->GetImportOptions();
 		}
 
 		common->DPrintf( "^1Reloading %s.\n", model->Name() );
 
 		if( isGLTF )
 		{
-			// RB: we don't have the options here so make sure this only applies to static models
-			model->InitFromFile( model->Name(), NULL );
+			model->InitFromFile( model->Name(), options );
 		}
 		else
 		{
 			model->LoadModel();
 		}
-
 	}
 
 	// we must force the world to regenerate, because models may
 	// have changed size, making their references invalid
 	R_ReCreateWorldReferences();
+#endif
 }
 
 void idRenderModelManagerLocal::CreateMeshBuffers( nvrhi::ICommandList* commandList )
@@ -774,7 +834,9 @@ void idRenderModelManagerLocal::BeginLevelLoad()
 		model->SetLevelLoadReferenced( false );
 	}
 
+#if !defined( DMAP )
 	vertexCache.FreeStaticData();
+#endif
 }
 
 /*
@@ -907,6 +969,7 @@ void idRenderModelManagerLocal::EndLevelLoad()
 		}
 	}
 
+#if !defined( DMAP )
 	commandList->open();
 
 	for( int i = 0; i < models.Num(); i++ )
@@ -930,6 +993,7 @@ void idRenderModelManagerLocal::EndLevelLoad()
 
 	commandList->close();
 	deviceManager->GetDevice()->executeCommandList( commandList );
+#endif
 
 	// _D3XP added this
 	int	end = Sys_Milliseconds();
@@ -1155,18 +1219,14 @@ const char* idTokenizer::NextToken( const char* errorstring )
 #define DEFAULT_ANIM_EPSILON	0.125f
 #define DEFAULT_QUAT_EPSILON	( 1.0f / 8192.0f )
 
-void idImportOptions::Init( const char* commandline, const char* ospath )
+idImportOptions::idImportOptions()
 {
-	idStr		token;
-	idNamePair	joints;
-	int			i;
-	idAnimGroup*	group;
-	idStr		sourceDir;
-	idStr		destDir;
+	Reset();
+}
 
-	//Reset( commandline );
+void idImportOptions::Reset()
+{
 	scale				= 1.0f;
-	//type				= WRITE_MESH;
 	startframe			= -1;
 	endframe			= -1;
 	ignoreMeshes		= false;
@@ -1177,7 +1237,7 @@ void idImportOptions::Init( const char* commandline, const char* ospath )
 	framerate			= 24;
 	align				= "";
 	rotate				= 0.0f;
-	commandLine			= commandline;
+	commandLine			= "";
 	prefix				= "";
 	jointThreshold		= 0.05f;
 	ignoreScale			= false;
@@ -1187,12 +1247,10 @@ void idImportOptions::Init( const char* commandline, const char* ospath )
 	reOrient			= ang_zero;
 	armature			= "";
 	noMikktspace		= false;
+	declSourceTimeStamp	= FILE_NOT_FOUND_TIMESTAMP;
 
 	src.Clear();
 	dest.Clear();
-
-	idTokenizer tokens;
-	tokens.SetTokens( commandline );
 
 	keepjoints.Clear();
 	renamejoints.Clear();
@@ -1201,6 +1259,23 @@ void idImportOptions::Init( const char* commandline, const char* ospath )
 	skipmeshes.Clear();
 	keepmeshes.Clear();
 	groups.Clear();
+}
+
+void idImportOptions::Init( const char* commandline, const char* ospath )
+{
+	idStr		token;
+	idNamePair	joints;
+	int			i;
+	idAnimGroup*	group;
+	idStr		sourceDir;
+	idStr		destDir;
+
+	Reset();
+
+	idTokenizer tokens;
+	tokens.SetTokens( commandline );
+
+	commandLine = commandline;
 
 	/*
 	token = tokens.NextToken( "Missing export command" );

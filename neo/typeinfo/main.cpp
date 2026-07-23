@@ -74,6 +74,7 @@ int main( int argc, char** argv )
 	generator->AddDefine( "__TYPEINFOGEN__" );
 	generator->AddDefine( "_WIN32" );
 	generator->AddDefine( "ID_VULKAN" );
+	//generator->AddDefine( "VR_OPTIONS" );
 
 	generator->CreateTypeInfo( sourcePath );
 	generator->WriteTypeInfo( fileName );

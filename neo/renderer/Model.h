@@ -84,6 +84,11 @@ struct srfTriangles_t
 
 	triIndex_t* 				silIndexes;				// indexes changed to be the first vertex with same XYZ, ignoring normal and texcoords
 
+	// RB begin
+	idVec4*						mocVerts;				// idDrawVert has no w position
+	unsigned int* 				mocIndexes;				// uint32 instead of uint16 for the Masked Software Occlusion Culling SIMD loading code
+	// RB end
+
 	int							numMirroredVerts;		// this many verts at the end of the vert list are tangent mirrors
 	int* 						mirroredVerts;			// tri->mirroredVerts[0] is the mirror of tri->numVerts - tri->numMirroredVerts + 0
 
@@ -155,7 +160,7 @@ public:
 	virtual void				InitFromFile( const char* fileName, const idImportOptions* options ) = 0;
 
 	// Supports reading/writing binary file formats
-	virtual bool				LoadBinaryModel( idFile* file, const ID_TIME_T sourceTimeStamp ) = 0;
+	virtual bool				LoadBinaryModel( idFile* file, const ID_TIME_T sourceTimeStamp, const ID_TIME_T declSourceTimeStamp ) = 0;
 	virtual void				WriteBinaryModel( idFile* file, ID_TIME_T* _timeStamp = NULL ) const = 0;
 	virtual bool				SupportsBinaryModel() = 0;
 
@@ -226,6 +231,12 @@ public:
 	// for reloadModels
 	virtual ID_TIME_T			Timestamp() const = 0;
 
+	// RB: for checking if the modelDef has changed
+	virtual ID_TIME_T			DeclTimestamp() const = 0;
+
+	// RB: returns the name of the modelDef this model was loaded from
+	virtual const char*			GetModelDefName() const = 0;
+
 	// returns the number of surfaces
 	virtual int					NumSurfaces() const = 0;
 
@@ -290,10 +301,6 @@ public:
 
 	// Returns number of the joint nearest to the given triangle.
 	virtual int					NearestJoint( int surfaceNum, int a, int c, int b ) const = 0;
-
-	// Writing to and reading from a demo file.
-	virtual void				ReadFromDemoFile( class idDemoFile* f ) = 0;
-	virtual void				WriteToDemoFile( class idDemoFile* f ) = 0;
 
 	// if false, the model doesn't need to be linked into the world, because it
 	// can't contribute visually -- triggers, etc

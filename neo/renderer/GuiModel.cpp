@@ -67,24 +67,6 @@ void idGuiModel::Clear()
 
 /*
 ================
-idGuiModel::WriteToDemo
-================
-*/
-void idGuiModel::WriteToDemo( idDemoFile* demo )
-{
-}
-
-/*
-================
-idGuiModel::ReadFromDemo
-================
-*/
-void idGuiModel::ReadFromDemo( idDemoFile* demo )
-{
-}
-
-/*
-================
 idGuiModel::BeginFrame
 ================
 */
@@ -263,7 +245,7 @@ void idGuiModel::EmitFullScreen( Framebuffer* renderTarget )
 		tr.GetCroppedViewport( &viewDef->viewport );
 	}
 
-	bool stereoEnabled = ( renderSystem->GetStereo3DMode() != STEREO3D_OFF );
+	bool stereoEnabled = false; //( renderSystem->GetStereo3DMode() != STEREO3D_OFF );
 	if( stereoEnabled )
 	{
 		const float screenSeparation = GetScreenSeparationForGuis();
@@ -369,6 +351,8 @@ void idGuiModel::EmitImGui( ImDrawData* drawData )
 
 	idVec2 scaleToVirtual( ( float )renderSystem->GetVirtualWidth() / sysWidth, ( float )renderSystem->GetVirtualHeight() / sysHeight );
 
+	ImGuiIO& io = ImGui::GetIO();
+
 	for( int a = 0; a < drawData->CmdListsCount; a++ )
 	{
 		const ImDrawList* cmd_list = drawData->CmdLists[a];
@@ -389,7 +373,16 @@ void idGuiModel::EmitImGui( ImDrawData* drawData )
 				mat = ( const idMaterial* )pcmd->TextureId;
 			}
 
-			idScreenRect clipRect = { static_cast<short>( pcmd->ClipRect.x ), static_cast<short>( pcmd->ClipRect.y ), static_cast<short>( pcmd->ClipRect.z ), static_cast<short>( pcmd->ClipRect.w ) };
+			// RB: convert from upper left corner to bottom left (0, 0) like in GL!
+			idScreenRect clipRect =
+			{
+				static_cast<short>( pcmd->ClipRect.x ),
+				static_cast<short>( io.DisplaySize.y - pcmd->ClipRect.w ),
+				static_cast<short>( pcmd->ClipRect.z ),
+				static_cast<short>( io.DisplaySize.y - pcmd->ClipRect.y ),
+				0.0f,
+				1.0f
+			};
 
 			idDrawVert* verts = AllocTris( numVerts, indexBufferOffset, numIndexes, mat, tr.currentGLState, STEREO_DEPTH_TYPE_NONE, clipRect );
 			if( verts == NULL )

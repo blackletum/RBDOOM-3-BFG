@@ -29,6 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 #include "../Game_local.h"
 
+#if VR_OPTIONS
+
 const static int NUM_SYSTEM_OPTIONS_OPTIONS = 4;
 
 // TRC requires a maximum interoccular distance of 6.5cm even though human adults can easily have an interoccular distance of over 7.5cm
@@ -348,7 +350,7 @@ idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings::LoadData
 void idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings::LoadData()
 {
 
-	fields[ STEREO_FIELD_ENABLE ].SetInteger( renderSystem->GetStereoScopicRenderingMode() );
+	fields[ STEREO_FIELD_ENABLE ].SetInteger( 0 ); //vr_enable.GetInteger() );
 
 	fields[ STEREO_FIELD_SEPERATION ].SetFloat( 100.0f * ( stereoRender_interOccularCentimeters.GetFloat() / MAX_INTEROCCULAR_DISTANCE ) );
 
@@ -383,17 +385,15 @@ void idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings::AdjustFi
 
 	if( fieldIndex == STEREO_FIELD_ENABLE )
 	{
-		int numOptions = NUM_STEREO_ENABLE;
-		if( !renderSystem->HasQuadBufferSupport() )
-		{
-			numOptions--;
-		}
+		int numOptions = 2;
 
 		int adjusted = fields[ fieldIndex ].ToInteger() + adjustAmount;
 		adjusted += numOptions;
 		adjusted %= numOptions;
 		fields[fieldIndex].SetInteger( adjusted );
-		renderSystem->EnableStereoScopicRendering( ( stereo3DMode_t )adjusted );
+
+		// TODO
+		// renderSystem->EnableStereoScopicRendering( ( stereo3DMode_t )adjusted );
 
 		gameLocal.Shell_ClearRepeater();
 
@@ -466,6 +466,8 @@ idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings::IsRestartRequ
 */
 bool idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings::IsRestartRequired() const
 {
+#if 0
+	// TODO
 	if( fields[ STEREO_FIELD_ENABLE ].ToInteger() != originalFields[ STEREO_FIELD_ENABLE ].ToInteger() )
 	{
 		if( fields[ STEREO_FIELD_ENABLE ].ToInteger() == STEREO3D_QUAD_BUFFER || originalFields[ STEREO_FIELD_ENABLE ].ToInteger() == STEREO3D_QUAD_BUFFER )
@@ -473,5 +475,9 @@ bool idMenuScreen_Shell_Stereoscopics::idMenuDataSource_StereoSettings::IsRestar
 			return true;
 		}
 	}
+#endif
+
 	return false;
 }
+
+#endif

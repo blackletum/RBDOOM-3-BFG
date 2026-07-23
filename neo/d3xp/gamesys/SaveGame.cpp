@@ -1085,7 +1085,7 @@ void idRestoreGame::Error( const char* fmt, ... )
 	char	text[ 1024 ];
 
 	va_start( argptr, fmt );
-	vsprintf( text, fmt, argptr );
+	idStr::vsnPrintf( text, sizeof( text ), fmt, argptr );
 	va_end( argptr );
 
 	objects.DeleteContents( true );
@@ -1626,10 +1626,6 @@ void idRestoreGame::ReadRenderLight( renderLight_t& renderLight )
 	ReadVec3( renderLight.up );
 	ReadVec3( renderLight.start );
 	ReadVec3( renderLight.end );
-
-	// only idLight has a prelightModel and it's always based on the entityname, so we'll restore it there
-	// ReadModel( renderLight.prelightModel );
-	renderLight.prelightModel = NULL;
 
 	ReadInt( renderLight.lightId );
 

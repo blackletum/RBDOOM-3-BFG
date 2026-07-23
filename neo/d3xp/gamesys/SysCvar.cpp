@@ -43,7 +43,7 @@ All game cvars should be defined here.
 */
 
 struct gameVersion_s {
-	gameVersion_s() { sprintf( string, "%s.%d%s %s %s %s", ENGINE_VERSION, BUILD_NUMBER, BUILD_DEBUG, BUILD_STRING, __DATE__, __TIME__ ); }
+	gameVersion_s() { idStr::snPrintf( string, sizeof( string ), "%s.%d%s %s %s %s", ENGINE_VERSION, BUILD_NUMBER, BUILD_DEBUG, BUILD_STRING, __DATE__, __TIME__ ); }
 	char	string[256];
 } gameVersion;
 
@@ -322,4 +322,8 @@ idCVar g_grabberRandomMotion(		"g_grabberRandomMotion",	"1",			CVAR_GAME | CVAR_
 idCVar g_grabberHardStop(			"g_grabberHardStop",		"1",			CVAR_GAME | CVAR_BOOL | CVAR_CHEAT, "hard stops object if too fast" );
 idCVar g_grabberDamping(			"g_grabberDamping",			"0.5",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "damping of grabber" );
 
-idCVar g_xp_bind_run_once( "g_xp_bind_run_once", "0", CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE, "Rebind all controls once for D3XP." );
+idCVar g_xp_bind_run_once(          "g_xp_bind_run_once",		"0",			CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE, "Rebind all controls once for D3XP." );
+
+// RB: new game mode vars
+idCVar ng_classicFlashlight(		"ng_classicFlashlight",		"0",			CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE | CVAR_NEW, "Classic flash light weapon" );
+// RB end

@@ -2,7 +2,8 @@
 ===========================================================================
 
 Doom 3 BFG Edition GPL Source Code
-Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
+Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
+Copyright (C) 2024 Robert Beckebans
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -26,6 +27,7 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 #include "precompiled.h"
+#pragma hdrstop
 
 #include "../sys/sys_local.h"
 #include "../framework/EventLoop.h"
@@ -51,6 +53,14 @@ idSys* sys = NULL;
 	va_end( argptr )
 
 idCVar com_productionMode( "com_productionMode", "0", CVAR_SYSTEM | CVAR_BOOL, "0 - no special behavior, 1 - building a production build, 2 - running a production build" );
+
+/*
+==============================================================
+
+	idSys
+
+==============================================================
+*/
 
 void Sys_Printf( const char* fmt, ... )
 {
@@ -106,6 +116,21 @@ const char* Sys_EXEPath()
 		// RB end
 	}
 	return buf;
+}
+
+/*
+================
+Posix_Cwd
+================
+*/
+const char* Posix_Cwd()
+{
+	static char cwd[MAX_OSPATH];
+
+	getcwd( cwd, sizeof( cwd ) - 1 );
+	cwd[MAX_OSPATH - 1] = 0;
+
+	return cwd;
 }
 
 /*
@@ -258,13 +283,93 @@ ID_TIME_T Sys_FileTimeStamp( idFileHandle fp )
 }
 
 /*
-==============
+================
 Sys_DefaultBasePath
-==============
+
+Get the default base path
+- binary image path
+- current directory
+- macOS app bundle resources directory path			// SRS - added macOS app bundle resources path
+- build directory path								// SRS - added build directory path
+- hardcoded
+Try to be intelligent: if there is no BASE_GAMEDIR, try the next path
+================
 */
+static idStr basepath;
+
 const char* Sys_DefaultBasePath()
 {
-	return Sys_EXEPath();
+	struct stat st;
+	idStr testbase, exepath = {};
+	basepath = Sys_EXEPath();
+	if( basepath.Length() )
+	{
+		exepath = basepath.StripFilename();
+		testbase = basepath;
+		testbase += "/";
+		testbase += BASE_GAMEDIR;
+		if( stat( testbase.c_str(), &st ) != -1 && S_ISDIR( st.st_mode ) )
+		{
+			return basepath.c_str();
+		}
+		else
+		{
+			common->Printf( "no '%s' directory in exe path %s, skipping\n", BASE_GAMEDIR, basepath.c_str() );
+		}
+	}
+	if( basepath != Posix_Cwd() )
+	{
+		basepath = Posix_Cwd();
+		testbase = basepath;
+		testbase += "/";
+		testbase += BASE_GAMEDIR;
+		if( stat( testbase.c_str(), &st ) != -1 && S_ISDIR( st.st_mode ) )
+		{
+			return basepath.c_str();
+		}
+		else
+		{
+			common->Printf( "no '%s' directory in cwd path %s, skipping\n", BASE_GAMEDIR, basepath.c_str() );
+		}
+	}
+	if( exepath.Length() )
+	{
+#if defined(__APPLE__)
+		// SRS - Check for macOS app bundle resources path (up one dir level and down to Resources dir)
+		basepath = exepath;
+		basepath = basepath.StripFilename() + "/Resources";
+		testbase = basepath;
+		testbase += "/";
+		testbase += BASE_GAMEDIR;
+		if( stat( testbase.c_str(), &st ) != -1 && S_ISDIR( st.st_mode ) )
+		{
+			return basepath.c_str();
+		}
+		else
+		{
+			common->Printf( "no '%s' directory in macOS app bundle resources path %s, skipping\n", BASE_GAMEDIR, basepath.c_str() );
+		}
+#endif
+		// SRS - Check for linux/macOS build path (directory structure with build dir and possible config suffix)
+		basepath = exepath;
+		basepath.StripFilename();						// up 1st dir level for single-config dev builds
+#if !defined( NO_MULTI_CONFIG )
+		basepath.StripFilename();						// up 2nd dir level for multi-config dev builds with Debug/Release/etc suffix
+#endif
+		testbase = basepath;
+		testbase += "/";
+		testbase += BASE_GAMEDIR;
+		if( stat( testbase.c_str(), &st ) != -1 && S_ISDIR( st.st_mode ) )
+		{
+			return basepath.c_str();
+		}
+		else
+		{
+			common->Printf( "no '%s' directory in build path %s, skipping\n", BASE_GAMEDIR, basepath.c_str() );
+		}
+	}
+	common->Printf( "WARNING: using hardcoded default base path %s\n", DEFAULT_BASEPATH );
+	return DEFAULT_BASEPATH;
 }
 
 int Sys_NumLangs()
@@ -317,6 +422,13 @@ int Sys_Milliseconds()
 	// DG end
 }
 
+/*
+==============================================================
+
+	idCommon
+
+==============================================================
+*/
 class idCommonLocal : public idCommon
 {
 public:
@@ -324,19 +436,19 @@ public:
 	// Initialize everything.
 	// if the OS allows, pass argc/argv directly (without executable name)
 	// otherwise pass the command line in a single string (without executable name)
-	virtual void				Init( int argc, const char* const* argv, const char* cmdline ) { };
+	virtual void				Init( int argc, const char* const* argv, const char* cmdline ) {}
 
 	// Shuts down everything.
-	virtual void				Shutdown() { };
+	virtual void				Shutdown() {}
 	virtual bool				IsShuttingDown() const
 	{
 		return false;
 	};
 
-	virtual	void				CreateMainMenu() { };
+	virtual	void				CreateMainMenu() {}
 
 	// Shuts down everything.
-	virtual void				Quit() { };
+	virtual void				Quit() {}
 
 	// Returns true if common initialization is complete.
 	virtual bool				IsInitialized() const
@@ -345,28 +457,35 @@ public:
 	};
 
 	// Called repeatedly as the foreground thread for rendering and game logic.
-	virtual void				Frame() { };
+	virtual void				Frame() {}
 
 	// Redraws the screen, handling games, guis, console, etc
 	// in a modal manner outside the normal frame loop
-	virtual void				UpdateScreen() { };
+	virtual void				UpdateScreen( bool captureToImage, bool releaseMouse = true ) {}
 
-	virtual void				UpdateLevelLoadPacifier() { };
+	virtual void				UpdateLevelLoadPacifier() {}
+	virtual void				LoadPacifierInfo( VERIFY_FORMAT_STRING const char* fmt, ... ) {}
+	virtual void				LoadPacifierProgressTotal( int total ) {}
+	virtual void				LoadPacifierProgressIncrement( int step ) {}
+	virtual bool				LoadPacifierRunning()
+	{
+		return false;
+	}
 
 
 	// Checks for and removes command line "+set var arg" constructs.
 	// If match is NULL, all set commands will be executed, otherwise
 	// only a set with the exact name.
-	virtual void				StartupVariable( const char* match ) { };
+	virtual void				StartupVariable( const char* match ) {}
 
 	// Begins redirection of console output to the given buffer.
-	virtual void				BeginRedirect( char* buffer, int buffersize, void ( *flush )( const char* ) ) { };
+	virtual void				BeginRedirect( char* buffer, int buffersize, void ( *flush )( const char* ) ) {}
 
 	// Stops redirection of console output.
-	virtual void				EndRedirect() { };
+	virtual void				EndRedirect() {}
 
 	// Update the screen with every message printed.
-	virtual void				SetRefreshOnPrint( bool set ) { };
+	virtual void				SetRefreshOnPrint( bool set ) {}
 
 	virtual void			Printf( const char* fmt, ... )
 	{
@@ -380,6 +499,10 @@ public:
 	{
 		/*STDIO_PRINT( "", "" );*/
 	}
+	virtual void			VerbosePrintf( const char* fmt, ... )
+	{
+		/*STDIO_PRINT( "", "" );*/
+	}
 	virtual void			Warning( const char* fmt, ... )
 	{
 		STDIO_PRINT( "WARNING: ", "\n" );
@@ -390,10 +513,10 @@ public:
 	}
 
 	// Prints all queued warnings.
-	virtual void				PrintWarnings() { };
+	virtual void				PrintWarnings() {}
 
 	// Removes all queued warnings.
-	virtual void				ClearWarnings( const char* reason ) { };
+	virtual void				ClearWarnings( const char* reason ) {}
 
 	virtual void			Error( const char* fmt, ... )
 	{
@@ -502,14 +625,14 @@ public:
 		return useless;
 	};
 
-	virtual void				OnSaveCompleted( idSaveLoadParms& parms ) { };
-	virtual void				OnLoadCompleted( idSaveLoadParms& parms ) { };
-	virtual void				OnLoadFilesCompleted( idSaveLoadParms& parms ) { };
-	virtual void				OnEnumerationCompleted( idSaveLoadParms& parms ) { };
-	virtual void				OnDeleteCompleted( idSaveLoadParms& parms ) { };
-	virtual void				TriggerScreenWipe( const char* _wipeMaterial, bool hold ) { };
+	virtual void				OnSaveCompleted( idSaveLoadParms& parms ) {}
+	virtual void				OnLoadCompleted( idSaveLoadParms& parms ) {}
+	virtual void				OnLoadFilesCompleted( idSaveLoadParms& parms ) {}
+	virtual void				OnEnumerationCompleted( idSaveLoadParms& parms ) {}
+	virtual void				OnDeleteCompleted( idSaveLoadParms& parms ) {}
+	virtual void				TriggerScreenWipe( const char* _wipeMaterial, bool hold ) {}
 
-	virtual void				OnStartHosting( idMatchParameters& parms ) { };
+	virtual void				OnStartHosting( idMatchParameters& parms ) {}
 
 	virtual int					GetGameFrame()
 	{
@@ -535,7 +658,7 @@ public:
 		return useless;
 	};
 
-	virtual void				ResetPlayerInput( int playerIndex ) { };
+	virtual void				ResetPlayerInput( int playerIndex ) {}
 
 	virtual bool				JapaneseCensorship() const
 	{
@@ -543,20 +666,20 @@ public:
 	};
 
 	virtual void				QueueShowShell() { };		// Will activate the shell on the next frame.
-	virtual void				UpdateScreen( bool, bool ) { }
-	void						InitTool( const toolFlag_t, const idDict*, idEntity* ) { }
-	idDemoFile* 				ReadDemo()
-	{
-		return NULL;
-	}
-	idDemoFile* 				WriteDemo()
-	{
-		return NULL;
-	}
-	//virtual currentGame_t		GetCurrentGame() const {
-	//	return DOOM_CLASSIC;
-	//};
-	//virtual void				SwitchToGame(currentGame_t newGame) { };
+	virtual void				InitTool( const toolFlag_t, const idDict*, idEntity* ) {}
+
+	virtual void				LoadPacifierBinarizeFilename( const char* filename, const char* reason ) {}
+	virtual void				LoadPacifierBinarizeInfo( const char* info ) {}
+	virtual void				LoadPacifierBinarizeMiplevel( int level, int maxLevel ) {}
+	virtual void				LoadPacifierBinarizeProgress( float progress ) {}
+	virtual void				LoadPacifierBinarizeEnd() { };
+	virtual void				LoadPacifierBinarizeProgressTotal( int total ) {}
+	virtual void				LoadPacifierBinarizeProgressIncrement( int step ) {}
+
+	virtual void				DmapPacifierFilename( const char* filename, const char* reason ) {}
+	virtual void				DmapPacifierInfo( VERIFY_FORMAT_STRING const char* fmt, ... ) {}
+	virtual void				DmapPacifierCompileProgressTotal( int total ) {}
+	virtual void				DmapPacifierCompileProgressIncrement( int step ) {}
 };
 
 idCommonLocal		commonLocal;

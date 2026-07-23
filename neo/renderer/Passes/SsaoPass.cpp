@@ -254,14 +254,14 @@ void SsaoPass::Render(
 		quarterResExtent.maxY = ( quarterResExtent.maxY + 3 ) / 4;
 
 		// TODO required and remove this by fixing the shaders
+		// because they include #include <global_inc.hlsl>
 		renderProgManager.BindShader_TextureVertexColor();
-
 		renderProgManager.CommitConstantBuffer( commandList, true );
 
 		SsaoConstants ssaoConstants = {};
 		ssaoConstants.viewportOrigin = idVec2( viewDef->viewport.x1, viewDef->viewport.y1 );
 		ssaoConstants.viewportSize = idVec2( viewDef->viewport.GetWidth(), viewDef->viewport.GetHeight() );
-		ssaoConstants.pixelOffset = tr.backend.GetCurrentPixelOffset();
+		ssaoConstants.pixelOffset = tr.backend.GetCurrentPixelOffset( viewDef->taaFrameCount );
 
 		// RB: this actually should work but it only works with the old SSAO method ...
 		//ssaoConstants.matClipToView = viewDef->unprojectionToCameraRenderMatrix;
@@ -271,7 +271,11 @@ void SsaoPass::Render(
 		// RB: TODO: only need for DIRECTIONAL_OCCLUSION
 		// we don't store the view matrix separatly yet
 		//ssaoConstants.matViewToWorld = viewDef->worldSpace;
-		//idRenderMatrix::Inverse( ssaoConstants.matViewToWorld, ssaoConstants.matWorldToView );
+
+		// TODO would be nicer and faster to have idRenderMatrix::Copy
+		idRenderMatrix tmp;
+		idRenderMatrix::Transpose( *( idRenderMatrix* ) viewDef->worldSpace.modelViewMatrix, tmp );
+		idRenderMatrix::Transpose( tmp, ssaoConstants.matWorldToView );
 
 		ssaoConstants.clipToView = idVec2(
 									   viewDef->projectionMatrix[2 * 4 + 3] / viewDef->projectionMatrix[0 * 4 + 0],

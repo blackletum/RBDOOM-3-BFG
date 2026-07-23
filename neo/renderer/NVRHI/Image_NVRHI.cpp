@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013-2022 Robert Beckebans
+Copyright (C) 2013-2023 Robert Beckebans
 Copyright (C) 2022 Stephen Pridham
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
@@ -30,11 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-/*
-================================================================================================
-Contains the Image implementation for OpenGL.
-================================================================================================
-*/
+idCVar image_pixelLook( "image_pixelLook", "0", CVAR_BOOL | CVAR_ARCHIVE | CVAR_NEW, "Turn off linear filtering on most textures to achieve the 90s software renderer look" );
 
 #include "../RenderCommon.h"
 
@@ -75,34 +71,34 @@ pickImageUsage - copied from nvrhi vulkan-texture.cpp
 * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 * DEALINGS IN THE SOFTWARE.
 */
-vk::ImageUsageFlags pickImageUsage( const nvrhi::TextureDesc& desc )
+VkImageUsageFlags pickImageUsage( const nvrhi::TextureDesc& desc )
 {
 	const nvrhi::FormatInfo& formatInfo = nvrhi::getFormatInfo( desc.format );
 
-	vk::ImageUsageFlags usageFlags = vk::ImageUsageFlagBits::eTransferSrc |
-									 vk::ImageUsageFlagBits::eTransferDst |
-									 vk::ImageUsageFlagBits::eSampled;
+	VkImageUsageFlags usageFlags = VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+								   VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+								   VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
 
 	if( desc.isRenderTarget )
 	{
 		if( formatInfo.hasDepth || formatInfo.hasStencil )
 		{
-			usageFlags |= vk::ImageUsageFlagBits::eDepthStencilAttachment;
+			usageFlags |= VkImageUsageFlagBits::VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 		}
 		else
 		{
-			usageFlags |= vk::ImageUsageFlagBits::eColorAttachment;
+			usageFlags |= VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 		}
 	}
 
 	if( desc.isUAV )
 	{
-		usageFlags |= vk::ImageUsageFlagBits::eStorage;
+		usageFlags |= VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT;
 	}
 
 	if( desc.isShadingRateSurface )
 	{
-		usageFlags |= vk::ImageUsageFlagBits::eFragmentShadingRateAttachmentKHR;
+		usageFlags |= VkImageUsageFlagBits::VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR;
 	}
 
 	return usageFlags;
@@ -137,6 +133,16 @@ idImage::idImage( const char* name ) : imgName( name )
 	sourceFileTime = FILE_NOT_FOUND_TIMESTAMP;
 	binaryFileTime = FILE_NOT_FOUND_TIMESTAMP;
 	refCount = 0;
+
+#if 0
+	// debugging code
+	idStr ext;
+	imgName.ExtractFileExtension( ext );
+	if( ext.Length() > 0 )
+	{
+		common->Printf( "Image %s has extension\n", imgName.c_str() );
+	}
+#endif
 
 	DeferredLoadImage();
 }
@@ -298,6 +304,36 @@ void idImage::SetTexParameters()
 
 /*
 ========================
+idImage::GetSampler
+========================
+*/
+void* idImage::GetSampler( SamplerCache& samplerCache )
+{
+	if( R_UsePixelatedLook() )
+	{
+		if( !sampler )
+		{
+			nvrhi::SamplerDesc sampDesc = samplerDesc;
+
+			// turn off linear filtering
+			sampDesc.setAllFilters( false );
+
+			sampler = samplerCache.GetOrCreateSampler( samplerDesc );
+		}
+	}
+	else
+	{
+		if( !sampler )
+		{
+			sampler = samplerCache.GetOrCreateSampler( samplerDesc );
+		}
+	}
+
+	return ( void* )sampler.Get();
+}
+
+/*
+========================
 idImage::AllocImage
 
 Every image will pass through this function. Allocates all the necessary MipMap levels for the
@@ -345,7 +381,7 @@ void idImage::AllocImage()
 			format = nvrhi::Format::R8_UNORM;
 			break;
 
-		case FMT_R8:
+		case FMT_R8F:
 			format = nvrhi::Format::R8_UNORM;
 			break;
 
@@ -355,6 +391,10 @@ void idImage::AllocImage()
 
 		case FMT_DXT5:
 			format = nvrhi::Format::BC3_UNORM;
+			break;
+
+		case FMT_BC6H:
+			format = nvrhi::Format::BC6H_UFLOAT;
 			break;
 
 		case FMT_DEPTH:
@@ -414,10 +454,6 @@ void idImage::AllocImage()
 			format = nvrhi::Format::R11G11B10_FLOAT;
 			break;
 
-		case FMT_SRGB8:
-			format = nvrhi::Format::SRGBA8_UNORM;
-			break;
-
 		default:
 			idLib::Error( "Unhandled image format %d in %s\n", opts.format, GetName() );
 	}
@@ -449,7 +485,7 @@ void idImage::AllocImage()
 	if( maxTextureSize > 0 &&
 			int( Max( originalWidth, originalHeight ) ) > maxTextureSize &&
 			opts.isRenderTarget &&
-			opts.textureType == TT_2D )
+			opts.textureType == DTT_2D )
 	{
 		if( originalWidth >= originalHeight )
 		{
@@ -538,21 +574,21 @@ void idImage::AllocImage()
 		}
 	}
 
-	if( opts.textureType == TT_2D )
+	if( opts.textureType == DTT_2D )
 	{
 		textureDesc.setDimension( nvrhi::TextureDimension::Texture2D );
 	}
-	else if( opts.textureType == TT_CUBIC )
+	else if( opts.textureType == DTT_CUBIC )
 	{
 		textureDesc.setDimension( nvrhi::TextureDimension::TextureCube );
 		textureDesc.setArraySize( 6 );
 	}
-	else if( opts.textureType == TT_2D_ARRAY )
+	else if( opts.textureType == DTT_2D_ARRAY )
 	{
 		textureDesc.setDimension( nvrhi::TextureDimension::Texture2DArray );
 		textureDesc.setArraySize( 6 );
 	}
-	else if( opts.textureType == TT_2D_MULTISAMPLE )
+	else if( opts.textureType == DTT_2D_MULTISAMPLE )
 	{
 		textureDesc.setDimension( nvrhi::TextureDimension::Texture2DMS );
 		textureDesc.setArraySize( 1 );
@@ -562,7 +598,7 @@ void idImage::AllocImage()
 	if( m_VmaAllocator )
 	{
 		VkImageCreateInfo imageCreateInfo = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-		imageCreateInfo.flags = ( opts.textureType == TT_CUBIC ) ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0;
+		imageCreateInfo.flags = ( opts.textureType == DTT_CUBIC ) ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0;
 		imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 		imageCreateInfo.format = static_cast< VkFormat >( nvrhi::vulkan::convertFormat( format ) );
 		imageCreateInfo.extent.width = scaledWidth;
@@ -572,7 +608,7 @@ void idImage::AllocImage()
 		imageCreateInfo.arrayLayers = textureDesc.arraySize;
 		imageCreateInfo.samples = static_cast< VkSampleCountFlagBits >( opts.samples );
 		imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		imageCreateInfo.usage = static_cast< VkImageUsageFlags >( pickImageUsage( textureDesc ) );
+		imageCreateInfo.usage = pickImageUsage( textureDesc );
 		imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 

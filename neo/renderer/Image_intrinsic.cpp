@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013-2021 Robert Beckebans
+Copyright (C) 2013-2024 Robert Beckebans
 Copyright (C) 2022 Stephen Pridham
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
@@ -170,6 +170,24 @@ static void R_CyanImage( idImage* image, nvrhi::ICommandList* commandList )
 	image->GenerateImage( ( byte* )data, DEFAULT_SIZE, DEFAULT_SIZE, TF_DEFAULT, TR_REPEAT, TD_DIFFUSE, commandList );
 }
 
+static void R_RedClayImage( idImage* image, nvrhi::ICommandList* commandList )
+{
+	byte	data[DEFAULT_SIZE][DEFAULT_SIZE][4];
+
+	for( int x = 0; x < DEFAULT_SIZE; x++ )
+	{
+		for( int y = 0; y < DEFAULT_SIZE; y++ )
+		{
+			data[y][x][0] = 165;
+			data[y][x][1] = 42;
+			data[y][x][2] = 42;
+			data[y][x][3] = 255;
+		}
+	}
+
+	image->GenerateImage( ( byte* )data, DEFAULT_SIZE, DEFAULT_SIZE, TF_DEFAULT, TR_REPEAT, TD_DIFFUSE, commandList );
+}
+
 static void R_ChromeSpecImage( idImage* image, nvrhi::ICommandList* commandList )
 {
 	byte	data[DEFAULT_SIZE][DEFAULT_SIZE][4];
@@ -181,7 +199,7 @@ static void R_ChromeSpecImage( idImage* image, nvrhi::ICommandList* commandList 
 			data[y][x][0] = 0;
 			data[y][x][1] = 255;
 			data[y][x][2] = 255;
-			data[y][x][3] = 255;
+			data[y][x][3] = 128;
 		}
 	}
 
@@ -196,10 +214,10 @@ static void R_PlasticSpecImage( idImage* image, nvrhi::ICommandList* commandList
 	{
 		for( int y = 0; y < DEFAULT_SIZE; y++ )
 		{
-			data[y][x][0] = 0;
+			data[y][x][0] = 32;
 			data[y][x][1] = 0;
 			data[y][x][2] = 255;
-			data[y][x][3] = 255;
+			data[y][x][3] = 128;
 		}
 	}
 
@@ -217,6 +235,11 @@ static void R_RGBA8Image( idImage* image, nvrhi::ICommandList* commandList )
 	data[0][0][3] = 96;
 
 	image->GenerateImage( ( byte* )data, DEFAULT_SIZE, DEFAULT_SIZE, TF_DEFAULT, TR_REPEAT, TD_LOOKUP_TABLE_RGBA, commandList );
+}
+
+static void R_RGBA8Image_RT( idImage* image, nvrhi::ICommandList* commandList )
+{
+	image->GenerateImage( nullptr, 512, 512, TF_NEAREST, TR_CLAMP, TD_LOOKUP_TABLE_RGBA, nullptr, true, false, 1 );
 }
 
 static void R_RGBA8LinearImage( idImage* image, nvrhi::ICommandList* commandList )
@@ -1008,12 +1031,12 @@ static void R_CreateBrdfLutImage( idImage* image, nvrhi::ICommandList* commandLi
 
 static void R_CreateEnvprobeImage_UAC_lobby_irradiance( idImage* image, nvrhi::ICommandList* commandList )
 {
-	image->GenerateImage( ( byte* )IMAGE_ENV_UAC_LOBBY_AMB_H_Bytes, IMAGE_ENV_UAC_LOBBY_AMB_H_TEX_WIDTH, IMAGE_ENV_UAC_LOBBY_AMB_H_TEX_HEIGHT, TF_DEFAULT, TR_CLAMP, TD_R11G11B10F, commandList, false, false, 1, CF_2D_PACKED_MIPCHAIN );
+	image->GenerateImage( ( byte* )IMAGE_ENV_UAC_LOBBY_AMB_H_Bytes, IMAGE_ENV_UAC_LOBBY_AMB_H_TEX_WIDTH, IMAGE_ENV_UAC_LOBBY_AMB_H_TEX_HEIGHT, TF_LINEAR, TR_CLAMP, TD_HDR_LIGHTPROBE, commandList, false, false, 1, CF_2D_PACKED_MIPCHAIN );
 }
 
 static void R_CreateEnvprobeImage_UAC_lobby_radiance( idImage* image, nvrhi::ICommandList* commandList )
 {
-	image->GenerateImage( ( byte* )IMAGE_ENV_UAC_LOBBY_SPEC_H_Bytes, IMAGE_ENV_UAC_LOBBY_SPEC_H_TEX_WIDTH, IMAGE_ENV_UAC_LOBBY_SPEC_H_TEX_HEIGHT, TF_DEFAULT, TR_CLAMP, TD_R11G11B10F, commandList, false, false, 1, CF_2D_PACKED_MIPCHAIN );
+	image->GenerateImage( ( byte* )IMAGE_ENV_UAC_LOBBY_SPEC_H_Bytes, IMAGE_ENV_UAC_LOBBY_SPEC_H_TEX_WIDTH, IMAGE_ENV_UAC_LOBBY_SPEC_H_TEX_HEIGHT, TF_DEFAULT, TR_CLAMP, TD_HDR_LIGHTPROBE, commandList, false, false, 1, CF_2D_PACKED_MIPCHAIN );
 }
 
 // RB end
@@ -1041,6 +1064,7 @@ void idImageManager::CreateIntrinsicImages()
 	blackImage = ImageFromFunction( "_black", R_BlackImage );
 	blackDiffuseImage = ImageFromFunction( "_blackDiffuse", R_BlackDiffuseImage );
 	cyanImage = ImageFromFunction( "_cyan", R_CyanImage );
+	redClayImage = ImageFromFunction( "_redClay", R_RedClayImage );
 	flatNormalMap = ImageFromFunction( "_flat", R_FlatNormalImage );
 	alphaNotchImage = ImageFromFunction( "_alphaNotch", R_AlphaNotchImage );
 	fogImage = ImageFromFunction( "_fog", R_FogImage );
@@ -1064,7 +1088,6 @@ void idImageManager::CreateIntrinsicImages()
 	blueNoiseImage256 = globalImages->ImageFromFunction( "_blueNoise256", R_CreateBlueNoise256Image );
 
 	currentRenderHDRImage = globalImages->ImageFromFunction( "_currentRenderHDR", R_HDR_RGBA16FImage_ResNative_MSAAOpt );
-	currentRenderHDRImage64 = globalImages->ImageFromFunction( "_currentRenderHDR64", R_HDR_RGBA16FImage_Res64 );
 	ldrImage = globalImages->ImageFromFunction( "_currentRenderLDR", R_LdrNativeImage );
 
 	taaMotionVectorsImage = ImageFromFunction( "_taaMotionVectors", R_HDR_RG16FImage_ResNative ); // RB: could be shared with _currentNormals.zw
@@ -1078,21 +1101,20 @@ void idImageManager::CreateIntrinsicImages()
 	bloomRenderImage[0] = globalImages->ImageFromFunction( "_bloomRender0", R_HDR_RGBA16FImage_ResQuarter_Linear );
 	bloomRenderImage[1] = globalImages->ImageFromFunction( "_bloomRender1", R_HDR_RGBA16FImage_ResQuarter_Linear );
 
-	glowImage[0] = globalImages->ImageFromFunction( "_glowImage0", R_RGBA8Image_ResGui );
-	glowImage[1] = globalImages->ImageFromFunction( "_glowImage1", R_RGBA8Image_ResGui );
-	glowDepthImage[0] = globalImages->ImageFromFunction( "_glowDepthImage0", R_DepthImage );
-	glowDepthImage[1] = globalImages->ImageFromFunction( "_glowDepthImage1", R_DepthImage );
+	//glowImage[0] = globalImages->ImageFromFunction( "_glowImage0", R_RGBA8Image_ResGui );
+	//glowImage[1] = globalImages->ImageFromFunction( "_glowImage1", R_RGBA8Image_ResGui );
+	//glowDepthImage[0] = globalImages->ImageFromFunction( "_glowDepthImage0", R_DepthImage );
+	//glowDepthImage[1] = globalImages->ImageFromFunction( "_glowDepthImage1", R_DepthImage );
 
-	accumTransparencyImage = globalImages->ImageFromFunction( "_accumTransparencyImage", R_HDR_RGBA16FImage_ResNative_Linear );
-	revealTransparencyImage = globalImages->ImageFromFunction( "_revealTransparencyImage", R_R8Image_ResNative_Linear );
+	//accumTransparencyImage = globalImages->ImageFromFunction( "_accumTransparencyImage", R_HDR_RGBA16FImage_ResNative_Linear );
+	//revealTransparencyImage = globalImages->ImageFromFunction( "_revealTransparencyImage", R_R8Image_ResNative_Linear );
 
 	heatmap5Image = ImageFromFunction( "_heatmap5", R_CreateHeatmap5ColorsImage );
 	heatmap7Image = ImageFromFunction( "_heatmap7", R_CreateHeatmap7ColorsImage );
 
 	grainImage1 = globalImages->ImageFromFunction( "_grain1", R_CreateGrainImage1 );
 
-	smaaInputImage = ImageFromFunction( "_smaaInput", R_RGBA8LinearImage );
-
+	smaaInputImage = ImageFromFunction( "_smaaInput", R_SMAAImage_ResNative );
 	smaaAreaImage = globalImages->ImageFromFunction( "_smaaArea", R_CreateSMAAAreaImage );
 	smaaSearchImage = globalImages->ImageFromFunction( "_smaaSearch", R_CreateSMAASearchImage );
 
@@ -1111,13 +1133,17 @@ void idImageManager::CreateIntrinsicImages()
 	chromeSpecImage = ImageFromFunction( "_chromeSpec", R_ChromeSpecImage );
 	plasticSpecImage = ImageFromFunction( "_plasticSpec", R_PlasticSpecImage );
 	brdfLutImage = ImageFromFunction( "_brdfLut", R_CreateBrdfLutImage );
+
+	defaultUACIrradianceCube = ImageFromFunction( "_defaultUACIrradiance", R_CreateEnvprobeImage_UAC_lobby_irradiance );
+	defaultUACRadianceCube = ImageFromFunction( "_defaultUACRadiance", R_CreateEnvprobeImage_UAC_lobby_radiance );
 	// RB end
 
 	// scratchImage is used for screen wipes/doublevision etc..
 	scratchImage = ImageFromFunction( "_scratch", R_RGBA8Image );
 	scratchImage2 = ImageFromFunction( "_scratch2", R_RGBA8Image );
-	accumImage = ImageFromFunction( "_accum", R_RGBA8Image );
-	currentRenderImage = ImageFromFunction( "_currentRender", R_HDR_RGBA16FImage_ResNative );
+	accumImage = ImageFromFunction( "_accum", R_RGBA8Image_RT );
+	currentRenderImage = globalImages->ImageFromFunction( "_currentRender", R_HDR_RGBA16FImage_ResNative );
+	//currentRenderImage = globalImages->ImageFromFunction( "_currentRender", R_LdrNativeImage );
 	currentDepthImage = ImageFromFunction( "_currentDepth", R_DepthImage );
 
 	// save a copy of this for material comparison, because currentRenderImage may get
@@ -1127,19 +1153,299 @@ void idImageManager::CreateIntrinsicImages()
 	loadingIconImage = ImageFromFile( "textures/loadingicon2", TF_DEFAULT, TR_CLAMP, TD_DEFAULT, CF_2D );
 	hellLoadingIconImage = ImageFromFile( "textures/loadingicon3", TF_DEFAULT, TR_CLAMP, TD_DEFAULT, CF_2D );
 
-	// RB begin
-#if 0
-	defaultUACIrradianceCube = ImageFromFile( "env/UAC5_amb", TF_DEFAULT, TR_CLAMP, TD_R11G11B10F, CF_2D_PACKED_MIPCHAIN );
-	defaultUACRadianceCube = ImageFromFile( "env/UAC5_spec", TF_DEFAULT, TR_CLAMP, TD_R11G11B10F, CF_2D_PACKED_MIPCHAIN );
-#else
-	defaultUACIrradianceCube = ImageFromFunction( "_defaultUACIrradiance", R_CreateEnvprobeImage_UAC_lobby_irradiance );
-	defaultUACRadianceCube = ImageFromFunction( "_defaultUACRadiance", R_CreateEnvprobeImage_UAC_lobby_radiance );
-#endif
-	// RB end
-
 	guiEdit = ImageFromFunction( "_guiEdit", R_GuiEditFunction );
 	guiEditDepthStencilImage = ImageFromFunction( "_guiEditDepthStencil", R_GuiEditDepthStencilFunction );
 
 	release_assert( loadingIconImage->referencedOutsideLevelLoad );
 	release_assert( hellLoadingIconImage->referencedOutsideLevelLoad );
+}
+
+
+CONSOLE_COMMAND( makeImageHeader, "load an image and turn it into a .h file", NULL )
+{
+	byte*		buffer;
+	int			width = 0, height = 0;
+
+	if( args.Argc() < 2 )
+	{
+		common->Printf( "USAGE: makeImageHeader filename [exportname]\n" );
+		return;
+	}
+
+	idStr filename = args.Argv( 1 );
+
+	R_LoadImage( filename, &buffer, &width, &height, NULL, true, NULL );
+	if( !buffer )
+	{
+		common->Printf( "loading %s failed.\n", filename.c_str() );
+		return;
+	}
+
+	filename.StripFileExtension();
+
+	idStr exportname;
+
+	if( args.Argc() == 3 )
+	{
+		exportname.Format( "Image_%s.h", args.Argv( 2 ) );
+	}
+	else
+	{
+		exportname.Format( "Image_%s.h", filename.c_str() );
+	}
+
+	for( int i = 0; i < exportname.Length(); i++ )
+	{
+		if( exportname[ i ] == '/' )
+		{
+			exportname[ i ] = '_';
+		}
+	}
+
+	idFileLocal headerFile( fileSystem->OpenFileWrite( exportname, "fs_basepath" ) );
+
+	idStr uppername = exportname;
+	uppername.ToUpper();
+
+	for( int i = 0; i < uppername.Length(); i++ )
+	{
+		if( uppername[ i ] == '.' )
+		{
+			uppername[ i ] = '_';
+		}
+	}
+
+	headerFile->Printf( "#ifndef %s_TEX_H\n", uppername.c_str() );
+	headerFile->Printf( "#define %s_TEX_H\n\n", uppername.c_str() );
+
+	headerFile->Printf( "#define %s_TEX_WIDTH %i\n", uppername.c_str(), width );
+	headerFile->Printf( "#define %s_TEX_HEIGHT %i\n\n", uppername.c_str(), height );
+
+	headerFile->Printf( "static const unsigned char %s_Bytes[] = {\n", uppername.c_str() );
+
+	int bufferSize = width * height * 4;
+
+	for( int i = 0; i < bufferSize; i++ )
+	{
+		byte b = buffer[i];
+
+		if( i < ( bufferSize - 1 ) )
+		{
+			headerFile->Printf( "0x%02hhx, ", b );
+		}
+		else
+		{
+			headerFile->Printf( "0x%02hhx", b );
+		}
+
+		if( i % 12 == 0 )
+		{
+			headerFile->Printf( "\n" );
+		}
+	}
+	headerFile->Printf( "\n};\n#endif\n" );
+
+	Mem_Free( buffer );
+}
+
+class idSortColors : public idSort_Quick< idVec3, idSortColors >
+{
+public:
+	int SizeMetric( const idVec3& v ) const
+	{
+		return v.x * v.x + v.y * v.y + v.z * v.z;
+	}
+	int Compare( const idVec3& a, const idVec3& b ) const
+	{
+		//idVec3 diff = b - a;
+		//return SizeMetric( diff );
+
+		return SizeMetric( a ) - SizeMetric( b );
+	}
+};
+
+idVec3 Average( const idList<idVec3>& colors )
+{
+	idVec3 avg = vec3_zero;
+
+	int numColors = colors.Num();
+	for( int i = 0; i < numColors; i++ )
+	{
+		avg += colors[i];
+	}
+	avg *= ( 1.0f / numColors );
+
+	return avg;
+}
+
+idVec3 Median( const idList<idVec3>& sortedPal )
+{
+	return sortedPal[sortedPal.Num() / 2];
+}
+
+CONSOLE_COMMAND( makePaletteHeader, "load a .pal palette, build an image from it and turn it into a .h file", NULL )
+{
+	if( args.Argc() < 2 )
+	{
+		common->Printf( "USAGE: makePaletteHeader filename [exportname]\n" );
+		return;
+	}
+
+	idStr filename = args.Argv( 1 );
+	filename.DefaultFileExtension( ".pal" );
+
+	ID_TIME_T timeStamp;
+	char* palBuffer;
+	int palBufferLen = fileSystem->ReadFile( filename, ( void** )&palBuffer, &timeStamp );
+	if( palBufferLen <= 0 || palBuffer == nullptr )
+	{
+		return;
+	}
+
+	// parse JASC-PAL file
+	idLexer src;
+	idToken	token, token2;
+
+	src.LoadMemory( palBuffer, palBufferLen, filename, 0 );
+
+	src.ExpectTokenString( "JASC" );
+	src.ExpectTokenString( "-" );
+	src.ExpectTokenString( "PAL" );
+	int palVersion = src.ParseInt();
+
+	int numColors = src.ParseInt();
+
+	idList<idVec3> colors;
+	colors.AssureSize( numColors );
+
+	idVec3 rgb;
+	for( int i = 0; i < numColors; i++ )
+	{
+		rgb[0] = src.ParseInt();
+		rgb[1] = src.ParseInt();
+		rgb[2] = src.ParseInt();
+
+		colors[ i ] = rgb;
+
+		//idLib::Printf( "RGB( %d, %d, %d ),\n", (int)rgb[0], (int)rgb[1], (int)rgb[2] );
+	}
+
+	idLib::Printf( "// SORTED ============\n" );
+	colors.SortWithTemplate( idSortColors() );
+
+	idLib::Printf( "const float3 palette[NUM_COLORS] = // %d\n{\n", numColors );
+	for( int i = 0; i < numColors; i++ )
+	{
+		rgb = colors[ i ];
+		idLib::Printf( "\tRGB( %d, %d, %d ),\n", ( int )rgb[0], ( int )rgb[1], ( int )rgb[2] );
+	}
+	idLib::Printf( "};\n\n" );
+
+	// calc the median absolute deviation
+	idVec3 median = Median( colors );
+	idList<idVec3> deviations;
+	deviations.AssureSize( numColors );
+
+	for( int i = 0; i < numColors; i++ )
+	{
+		idVec3 diff = colors[i] - median;
+		deviations[i].x = idMath::Fabs( diff.x );
+		deviations[i].y = idMath::Fabs( diff.y );
+		deviations[i].z = idMath::Fabs( diff.z );
+	}
+
+	deviations.SortWithTemplate( idSortColors() );
+	rgb = Median( deviations );
+
+	idLib::Printf( "const float3 medianAbsoluteDeviation = RGB( %d, %d, %d );\n", ( int )rgb[0], ( int )rgb[1], ( int )rgb[2] );
+
+	// calc the standard deviation
+	idVec3 avg = Average( colors );
+
+	idVec3 deviation = vec3_zero;
+	for( int i = 0; i < numColors; i++ )
+	{
+		idVec3 diff = colors[i] - avg;
+		deviation.x += idMath::Fabs( diff.x );
+		deviation.y += idMath::Fabs( diff.y );
+		deviation.z += idMath::Fabs( diff.z );
+	}
+	deviation *= ( 1.0f / numColors );
+
+	rgb = deviation;
+	idLib::Printf( "const float3 deviation = RGB( %d, %d, %d );\n", ( int )rgb[0], ( int )rgb[1], ( int )rgb[2] );
+
+	fileSystem->FreeFile( palBuffer );
+
+	filename.StripFileExtension();
+
+	// TODO build image and convert to header
+	//byte*		buffer;
+	//int			width = 0, height = 0;
+
+	/*
+	idStr exportname;
+
+	if( args.Argc() == 3 )
+	{
+		exportname.Format( "Image_%s.h", args.Argv( 2 ) );
+	}
+	else
+	{
+		exportname.Format( "Image_%s.h", filename.c_str() );
+	}
+
+	for( int i = 0; i < exportname.Length(); i++ )
+	{
+		if( exportname[ i ] == '/' )
+		{
+			exportname[ i ] = '_';
+		}
+	}
+
+	idFileLocal headerFile( fileSystem->OpenFileWrite( exportname, "fs_basepath" ) );
+
+	idStr uppername = exportname;
+	uppername.ToUpper();
+
+	for( int i = 0; i < uppername.Length(); i++ )
+	{
+		if( uppername[ i ] == '.' )
+		{
+			uppername[ i ] = '_';
+		}
+	}
+
+	headerFile->Printf( "#ifndef %s_TEX_H\n", uppername.c_str() );
+	headerFile->Printf( "#define %s_TEX_H\n\n", uppername.c_str() );
+
+	headerFile->Printf( "#define %s_TEX_WIDTH %i\n", uppername.c_str(), width );
+	headerFile->Printf( "#define %s_TEX_HEIGHT %i\n\n", uppername.c_str(), height );
+
+	headerFile->Printf( "static const unsigned char %s_Bytes[] = {\n", uppername.c_str() );
+
+	int bufferSize = width * height * 4;
+
+	for( int i = 0; i < bufferSize; i++ )
+	{
+		byte b = buffer[i];
+
+		if( i < ( bufferSize - 1 ) )
+		{
+			headerFile->Printf( "0x%02hhx, ", b );
+		}
+		else
+		{
+			headerFile->Printf( "0x%02hhx", b );
+		}
+
+		if( i % 12 == 0 )
+		{
+			headerFile->Printf( "\n" );
+		}
+	}
+	headerFile->Printf( "\n};\n#endif\n" );
+
+	Mem_Free( buffer );
+	*/
 }

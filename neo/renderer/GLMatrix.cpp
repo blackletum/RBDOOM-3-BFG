@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2014 Robert Beckebans
+Copyright (C) 2014-2024 Robert Beckebans
 Copyright (C) 2022 Stephen Pridham
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
@@ -211,6 +211,7 @@ R_GlobalToNormalizedDeviceCoordinates
 -1 to 1 range in x, y, and z
 ==========================
 */
+#if !defined( DMAP )
 void R_GlobalToNormalizedDeviceCoordinates( const idVec3& global, idVec3& ndc )
 {
 	idPlane	view;
@@ -240,6 +241,7 @@ void R_GlobalToNormalizedDeviceCoordinates( const idVec3& global, idVec3& ndc )
 	ndc[1] = clip[1] * invW;
 	ndc[2] = clip[2] * invW;		// NOTE: in D3D this is in the range [0,1]
 }
+#endif
 
 /*
 ======================
@@ -409,67 +411,9 @@ idCVar r_centerX( "r_centerX", "0", CVAR_FLOAT, "projection matrix center adjust
 idCVar r_centerY( "r_centerY", "0", CVAR_FLOAT, "projection matrix center adjust" );
 idCVar r_centerScale( "r_centerScale", "1", CVAR_FLOAT, "projection matrix center adjust" );
 
-inline float sgn( float a )
-{
-	if( a > 0.0f )
-	{
-		return ( 1.0f );
-	}
-	if( a < 0.0f )
-	{
-		return ( -1.0f );
-	}
-	return ( 0.0f );
-}
 
-// clipPlane is a plane in camera space.
-void ModifyProjectionMatrix( viewDef_t* viewDef, const idPlane& clipPlane )
-{
-	static float s_flipMatrix[16] =
-	{
-		// convert from our coordinate system (looking down X)
-		// to OpenGL's coordinate system (looking down -Z)
-		0, 0, -1, 0,
-		-1, 0,  0, 0,
-		0, 1,  0, 0,
-		0, 0,  0, 1
-	};
 
-	idMat4 flipMatrix;
-	memcpy( &flipMatrix, &( s_flipMatrix[0] ), sizeof( float ) * 16 );
-
-	idVec4 vec = clipPlane.ToVec4();// * flipMatrix;
-	idPlane newPlane( vec[0], vec[1], vec[2], vec[3] );
-
-	// Calculate the clip-space corner point opposite the clipping plane
-	// as (sgn(clipPlane.x), sgn(clipPlane.y), 1, 1) and
-	// transform it into camera space by multiplying it
-	// by the inverse of the projection matrix
-
-	//idVec4 q;
-	//q.x = (sgn(newPlane[0]) + viewDef->projectionMatrix[8]) / viewDef->projectionMatrix[0];
-	//q.y = (sgn(newPlane[1]) + viewDef->projectionMatrix[9]) / viewDef->projectionMatrix[5];
-	//q.z = -1.0F;
-	//q.w = (1.0F + viewDef->projectionMatrix[10]) / viewDef->projectionMatrix[14];
-
-	idMat4 unprojection;
-	R_MatrixFullInverse( viewDef->projectionMatrix, ( float* )&unprojection );
-	idVec4 q = unprojection * idVec4( sgn( newPlane[0] ), sgn( newPlane[1] ), 1.0f, 1.0f );
-
-	// Calculate the scaled plane vector
-	idVec4 c = newPlane.ToVec4() * ( 2.0f / ( q * newPlane.ToVec4() ) );
-
-	float matrix[16];
-	std::memcpy( matrix, viewDef->projectionMatrix, sizeof( float ) * 16 );
-
-	// Replace the third row of the projection matrix
-	matrix[2] = c[0];
-	matrix[6] = c[1];
-	matrix[10] = c[2] + 1.0f;
-	matrix[14] = c[3];
-
-	memcpy( viewDef->projectionMatrix, matrix, sizeof( float ) * 16 );
-}
+#if !defined( DMAP )
 
 void R_SetupProjectionMatrix( viewDef_t* viewDef, bool doJitter )
 {
@@ -480,7 +424,7 @@ void R_SetupProjectionMatrix( viewDef_t* viewDef, bool doJitter )
 
 	if( R_UseTemporalAA() && doJitter && !( viewDef->renderView.rdflags & RDF_IRRADIANCE ) )
 	{
-		idVec2 jitter = tr.backend.GetCurrentPixelOffset();
+		idVec2 jitter = tr.backend.GetCurrentPixelOffset( viewDef->taaFrameCount );
 		jitterx = jitter.x;
 		jittery = jitter.y;
 	}
@@ -678,6 +622,8 @@ void R_SetupUnprojection( viewDef_t* viewDef )
 	idRenderMatrix::Transpose( *( idRenderMatrix* )viewDef->unprojectionToWorldMatrix, viewDef->unprojectionToWorldRenderMatrix );
 }
 
+#endif // #if !defined( DMAP )
+
 void R_MatrixFullInverse( const float a[16], float r[16] )
 {
 	idMat4	am;
@@ -711,6 +657,68 @@ void R_MatrixFullInverse( const float a[16], float r[16] )
 // RB end
 
 // SP begin
+inline float sgn( float a )
+{
+	if( a > 0.0f )
+	{
+		return ( 1.0f );
+	}
+	if( a < 0.0f )
+	{
+		return ( -1.0f );
+	}
+	return ( 0.0f );
+}
+
+// clipPlane is a plane in camera space.
+void ModifyProjectionMatrix( viewDef_t* viewDef, const idPlane& clipPlane )
+{
+	static float s_flipMatrix[16] =
+	{
+		// convert from our coordinate system (looking down X)
+		// to OpenGL's coordinate system (looking down -Z)
+		0, 0, -1, 0,
+		-1, 0,  0, 0,
+		0, 1,  0, 0,
+		0, 0,  0, 1
+	};
+
+	idMat4 flipMatrix;
+	memcpy( &flipMatrix, &( s_flipMatrix[0] ), sizeof( float ) * 16 );
+
+	idVec4 vec = clipPlane.ToVec4();// * flipMatrix;
+	idPlane newPlane( vec[0], vec[1], vec[2], vec[3] );
+
+	// Calculate the clip-space corner point opposite the clipping plane
+	// as (sgn(clipPlane.x), sgn(clipPlane.y), 1, 1) and
+	// transform it into camera space by multiplying it
+	// by the inverse of the projection matrix
+
+	//idVec4 q;
+	//q.x = (sgn(newPlane[0]) + viewDef->projectionMatrix[8]) / viewDef->projectionMatrix[0];
+	//q.y = (sgn(newPlane[1]) + viewDef->projectionMatrix[9]) / viewDef->projectionMatrix[5];
+	//q.z = -1.0F;
+	//q.w = (1.0F + viewDef->projectionMatrix[10]) / viewDef->projectionMatrix[14];
+
+	idMat4 unprojection;
+	R_MatrixFullInverse( viewDef->projectionMatrix, ( float* )&unprojection );
+	idVec4 q = unprojection * idVec4( sgn( newPlane[0] ), sgn( newPlane[1] ), 1.0f, 1.0f );
+
+	// Calculate the scaled plane vector
+	idVec4 c = newPlane.ToVec4() * ( 2.0f / ( q * newPlane.ToVec4() ) );
+
+	float matrix[16];
+	std::memcpy( matrix, viewDef->projectionMatrix, sizeof( float ) * 16 );
+
+	// Replace the third row of the projection matrix
+	matrix[2] = c[0];
+	matrix[6] = c[1];
+	matrix[10] = c[2] + 1.0f;
+	matrix[14] = c[3];
+
+	memcpy( viewDef->projectionMatrix, matrix, sizeof( float ) * 16 );
+}
+
 /*
 =====================
 R_ObliqueProjection - adjust near plane of previously set projection matrix to perform an oblique projection

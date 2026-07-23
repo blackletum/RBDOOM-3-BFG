@@ -78,7 +78,8 @@ BinkHandle Bink_Open(const char* fileName)
 	classInstances.push_back(newDecoder);
 
 	// get a handle ID
-	newHandle.instanceIndex = classInstances.size() - 1;
+	// SRS - added int cast for type consistency
+	newHandle.instanceIndex = (int)classInstances.size() - 1;
 	
 	return newHandle;
 }
@@ -164,6 +165,10 @@ BinkDecoder::BinkDecoder()
 {
 	nFrames = 0;
 	currentFrame = 0;
+	for (int i = 0; i < BINK_NB_SRC; i++)
+	{
+		bundle[i].data = NULL;
+	}
 }
 
 BinkDecoder::~BinkDecoder()
@@ -173,6 +178,8 @@ BinkDecoder::~BinkDecoder()
 		delete[] planes[i].current;
 		delete[] planes[i].last;
 	}
+
+	FreeBundles();
 
 	for (uint32_t i = 0; i < audioTracks.size(); i++)
 	{

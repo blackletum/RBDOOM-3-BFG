@@ -169,7 +169,7 @@ TestGameAPI
 */
 void TestGameAPI()
 {
-	gameImport_t testImport;
+	gameImport_t testImport = {};
 	gameExport_t testExport;
 
 	testImport.sys						= ::sys;
@@ -1740,6 +1740,18 @@ void idGameLocal::MapShutdown()
 		gameRenderWorld->DebugClearPolygons( 0 );
 	}
 
+	// RB: kill ingame editors to prevent crashes during shutdown
+	if( com_editors != 0 )
+	{
+		com_editors = 0;
+		g_editEntityMode.SetInteger( 0 );
+
+		// turn off light debug drawing in the render backend
+		r_singleLight.SetInteger( -1 );
+		r_showLights.SetInteger( 0 );
+	}
+	// RB end
+
 	// clear out camera if we're in a cinematic
 	if( inCinematic )
 	{
@@ -1908,7 +1920,9 @@ void idGameLocal::CacheDictionaryMedia( const idDict* dict )
 	kv = dict->MatchPrefix( "model" );
 	while( kv )
 	{
-		if( kv->GetValue().Length() )
+		const char* modelKey = kv->GetKey().c_str();
+
+		if( kv->GetValue().Length() && idStr::Icmp( modelKey, "modelTarget" ) != 0 && idStr::Icmpn( modelKey, "modelscale", 10 ) != 0 )
 		{
 			declManager->MediaPrint( "Precaching model %s\n", kv->GetValue().c_str() );
 
@@ -2738,8 +2752,6 @@ void idGameLocal::RunFrame( idUserCmdMgr& cmdMgr, gameReturn_t& ret )
 			slow.realClientTime = slow.time;
 
 			SelectTimeGroup( false );
-
-			DemoWriteGameInfo();
 
 #ifdef GAME_DLL
 			// allow changing SIMD usage on the fly
@@ -4068,7 +4080,6 @@ idGameLocal::InhibitEntitySpawn
 */
 bool idGameLocal::InhibitEntitySpawn( idDict& spawnArgs )
 {
-
 	bool result = false;
 
 	if( common->IsMultiplayer() )
@@ -4113,7 +4124,7 @@ bool idGameLocal::InhibitEntitySpawn( idDict& spawnArgs )
 		}
 	}
 
-	// RB: TrenchBroom interop skip func_group entities
+	// RB: TrenchBroom interop skip func_group helper entities
 	{
 		const char* name = spawnArgs.GetString( "classname" );
 		const char* groupType = spawnArgs.GetString( "_tb_type" );
@@ -4399,7 +4410,21 @@ idEntity* idGameLocal::FindTraceEntity( idVec3 start, idVec3 end, const idTypeIn
 	bestScale = 1.0f;
 	for( ent = spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() )
 	{
-		if( ent->IsType( c ) && ent != skip )
+		// RB: use edit origin for lights
+		if( ent->IsType( idLight::Type ) && ent->IsType( c ) && ent != skip )
+		{
+			b[0] = b[1] = ent->GetEditOrigin();
+			b = b.Expand( 16 );
+			if( b.RayIntersection( start, end - start, scale ) )
+			{
+				if( scale >= 0.0f && scale < bestScale )
+				{
+					bestEnt = ent;
+					bestScale = scale;
+				}
+			}
+		}
+		else if( ent->IsType( c ) && ent != skip )
 		{
 			b = ent->GetPhysics()->GetAbsBounds().Expand( 16 );
 			if( b.RayIntersection( start, end - start, scale ) )
@@ -4550,7 +4575,7 @@ void idGameLocal::AlertAI( idEntity* ent )
 	if( ent && ent->IsType( idActor::Type ) )
 	{
 		// alert them for the next frame
-		lastAIAlertTime = time + 1;
+		lastAIAlertTime = framenum + 1;
 		lastAIAlertEntity = static_cast<idActor*>( ent );
 
 // jmarshall
@@ -4575,14 +4600,7 @@ idGameLocal::GetAlertEntity
 */
 idActor* idGameLocal::GetAlertEntity()
 {
-	int timeGroup = 0;
-	if( lastAIAlertTime && lastAIAlertEntity.GetEntity() )
-	{
-		timeGroup = lastAIAlertEntity.GetEntity()->timeGroup;
-	}
-	SetTimeState ts( timeGroup );
-
-	if( lastAIAlertTime >= time )
+	if( lastAIAlertTime >= framenum )
 	{
 		return lastAIAlertEntity.GetEntity();
 	}
@@ -6049,9 +6067,11 @@ void idGameLocal::Shell_SyncWithSession()
 	}
 	switch( session->GetState() )
 	{
+#if defined( USE_DOOMCLASSIC)
 		case idSession::PRESS_START:
 			shellHandler->SetShellState( SHELL_STATE_PRESS_START );
 			break;
+#endif
 		case idSession::INGAME:
 			shellHandler->SetShellState( SHELL_STATE_PAUSED );
 			break;
@@ -6142,17 +6162,6 @@ void idGameLocal::Shell_UpdateLeaderboard( const idLeaderboardCallback* callback
 
 /*
 ========================
-idGameLocal::StartDemoPlayback
-========================
-*/
-void idGameLocal::StartDemoPlayback( idRenderWorld* renderworld )
-{
-	gameRenderWorld = renderworld;
-	smokeParticles->Init();
-}
-
-/*
-========================
 idGameLocal::SimulateProjectiles
 ========================
 */
@@ -6191,67 +6200,7 @@ bool idGameLocal::SimulateProjectiles()
 	return moreProjectiles;
 }
 
-/*
-===============
-idGameLocal::DemoWriteGameInfo
-===============
-*/
-void idGameLocal::DemoWriteGameInfo()
-{
-	if( common->WriteDemo() != NULL )
-	{
-		common->WriteDemo()->WriteInt( DS_GAME );
-		common->WriteDemo()->WriteInt( GCMD_GAMETIME );
 
-		common->WriteDemo()->WriteInt( previousTime );
-		common->WriteDemo()->WriteInt( time );
-		common->WriteDemo()->WriteInt( framenum );
-
-		common->WriteDemo()->WriteInt( fast.previousTime );
-		common->WriteDemo()->WriteInt( fast.time );
-		common->WriteDemo()->WriteInt( fast.realClientTime );
-
-		common->WriteDemo()->WriteInt( slow.previousTime );
-		common->WriteDemo()->WriteInt( slow.time );
-		common->WriteDemo()->WriteInt( slow.realClientTime );
-	}
-}
-
-bool idGameLocal::ProcessDemoCommand( idDemoFile* readDemo )
-{
-	gameDemoCommand_t cmd = GCMD_UNKNOWN;
-
-	if( !readDemo->ReadInt( ( int& )cmd ) )
-	{
-		return false;
-	}
-
-	switch( cmd )
-	{
-		case GCMD_GAMETIME:
-		{
-			readDemo->ReadInt( previousTime );
-			readDemo->ReadInt( time );
-			readDemo->ReadInt( framenum );
-
-			readDemo->ReadInt( fast.previousTime );
-			readDemo->ReadInt( fast.time );
-			readDemo->ReadInt( fast.realClientTime );
-
-			readDemo->ReadInt( slow.previousTime );
-			readDemo->ReadInt( slow.time );
-			readDemo->ReadInt( slow.realClientTime );
-			break;
-		}
-		default:
-		{
-			common->Error( "Bad demo game command '%d' in demo stream", cmd );
-			break;
-		}
-	}
-
-	return true;
-}
 
 // jmarshall
 /*

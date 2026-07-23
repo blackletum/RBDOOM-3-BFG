@@ -29,7 +29,9 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __MENUSCREEN_H__
 #define __MENUSCREEN_H__
 
-#ifndef __TYPEINFOGEN__
+#ifdef __TYPEINFOGEN__
+	#define VR_OPTIONS 0
+#else
 	#include "../../renderer/RenderCommon.h"
 #endif
 
@@ -418,6 +420,7 @@ private:
 	bool						isMpPause;
 };
 
+#if defined(USE_DOOMCLASSIC)
 //*
 //================================================
 //idMenuScreen_Shell_PressStart
@@ -479,6 +482,7 @@ private:
 	const idMaterial* 			doom2Cover;
 	const idMaterial* 			doom3Cover;
 };
+#endif
 
 //*
 //================================================
@@ -1016,7 +1020,7 @@ public:
 			GAME_FIELD_AUTO_RELOAD,
 			GAME_FIELD_AIM_ASSIST,
 			GAME_FIELD_ALWAYS_SPRINT,
-			GAME_FIELD_FLASHLIGHT_SHADOWS,
+			GAME_FIELD_CLASSIC_FLASHLIGHT,
 			GAME_FIELD_MUZZLE_FLASHES,
 			MAX_GAME_FIELDS
 		};
@@ -1368,9 +1372,12 @@ public:
 			SYSTEM_FIELD_VSYNC,
 			SYSTEM_FIELD_ANTIALIASING,
 			// RB begin
-			SYSTEM_FIELD_POSTFX,
-			SYSTEM_FIELD_SSAO,
+			SYSTEM_FIELD_RENDERMODE,
 			SYSTEM_FIELD_AMBIENT_BRIGHTNESS,
+			SYSTEM_FIELD_SSAO,
+			SYSTEM_FIELD_BLOOD_REFLECTIONS,
+			SYSTEM_FIELD_FILMIC_POSTFX,
+			SYSTEM_FIELD_CRT_POSTFX,
 			// RB end
 			SYSTEM_FIELD_BRIGHTNESS,
 			SYSTEM_FIELD_VOLUME,
@@ -1405,9 +1412,12 @@ public:
 		float originalVolume;
 		// RB begin
 		//int originalShadowMapping; // TODO use for quality of shadowmaps?
-		int originalSSAO;
-		int originalPostProcessing;
+		int originalRenderMode;
 		float originalAmbientBrightness;
+		int originalSSAO;
+		int originalBloodReflections;
+		int originalPostProcessing;
+		int originalCRTPostFX;
 		// RB end
 
 		idList<vidMode_t>			modeList;
@@ -1430,6 +1440,8 @@ private:
 	idMenuWidget_Button*			btnBack;
 
 };
+
+#if VR_OPTIONS
 
 //*
 //================================================
@@ -1498,6 +1510,8 @@ private:
 	const idMaterial* 			leftEyeMat;
 	const idMaterial* 			rightEyeMat;
 };
+
+#endif
 
 //*
 //================================================

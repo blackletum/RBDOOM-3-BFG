@@ -69,6 +69,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "../framework/File_Manifest.h"
 #include "../framework/File_SaveGame.h"
 #include "../framework/File_Resource.h"
+#include "../framework/File_Zip.h"
 #include "../framework/FileSystem.h"
 #include "../framework/UsercmdGen.h"
 #include "../framework/Serializer.h"
@@ -179,7 +180,6 @@ constexpr uint32 NUM_FRAME_DATA	= 3;
 		#include "../framework/EditField.h"
 		#include "../framework/DebugGraph.h"
 		#include "../framework/Console.h"
-		#include "../framework/DemoFile.h"
 		#include "../framework/Common_dialog.h"
 
 	#endif /* !GAME_DLL */

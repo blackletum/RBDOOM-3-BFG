@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013-2021 Robert Beckebans
+Copyright (C) 2013-2024 Robert Beckebans
 Copyright (C) 2020 Panos Karabelas
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
@@ -102,11 +102,23 @@ float2 VogelDiskSample( float sampleIndex, float samplesCount, float phi )
 
 void main( PS_IN fragment, out PS_OUT result )
 {
-	float4 bumpMap =		t_Normal.Sample( s_Material, fragment.texcoord1.xy );
+	float2 baseUV = fragment.texcoord4.xy;
+	float2 bumpUV = fragment.texcoord1.xy;
+	float2 specUV = fragment.texcoord5.xy;
+
+	// PSX affine texture mapping
+	if( rpPSXDistortions.z > 0.0 )
+	{
+		baseUV /= fragment.texcoord1.z;
+		bumpUV /= fragment.texcoord1.z;
+		specUV /= fragment.texcoord1.z;
+	}
+
+	float4 bumpMap =		t_Normal.Sample( s_Material, bumpUV );
 	float4 lightFalloff =	idtex2Dproj( s_Lighting, t_LightFalloff, fragment.texcoord2 );
 	float4 lightProj =		idtex2Dproj( s_Lighting, t_LightProjection, fragment.texcoord3 );
-	float4 YCoCG =			t_BaseColor.Sample( s_Material, fragment.texcoord4.xy );
-	float4 specMapSRGB =	t_Specular.Sample( s_Material, fragment.texcoord5.xy );
+	float4 YCoCG =			t_BaseColor.Sample( s_Material, baseUV );
+	float4 specMapSRGB =	t_Specular.Sample( s_Material, specUV );
 	float4 specMap =		sRGBAToLinearRGBA( specMapSRGB );
 
 	float3 lightVector = normalize( fragment.texcoord0.xyz );
@@ -462,9 +474,9 @@ void main( PS_IN fragment, out PS_OUT result )
 	float hdotN = clamp( dot3( halfAngleVector, localNormal ), 0.0, 1.0 );
 
 #if USE_PBR
+	// RB: roughness 0 somehow is not shiny so we clamp it
+	float roughness = max( 0.05, specMapSRGB.r );
 	const float metallic = specMapSRGB.g;
-	const float roughness = specMapSRGB.r;
-	const float glossiness = 1.0 - roughness;
 
 	// the vast majority of real-world materials (anything not metal or gems) have F(0)
 	// values in a very narrow range (~0.02 - 0.08)
@@ -477,16 +489,34 @@ void main( PS_IN fragment, out PS_OUT result )
 
 	float3 diffuseColor = baseColor * ( 1.0 - metallic );
 	float3 specularColor = lerp( dielectricColor, baseColor, metallic );
+
+#elif KENNY_PBR
+	float3 diffuseColor = diffuseMap;
+	float3 specularColor;
+	float roughness;
+
+	PBRFromSpecmap( specMapSRGB.rgb, specularColor, roughness );
 #else
-	const float roughness = EstimateLegacyRoughness( specMapSRGB.rgb );
+	float roughness = EstimateLegacyRoughness( specMapSRGB.rgb );
 
 	float3 diffuseColor = diffuseMap;
 	float3 specularColor = specMapSRGB.rgb; // RB: should be linear but it looks too flat
 #endif
 
+#if 0
+	// specular AA - https://yusuketokuyoshi.com/papers/2021/Tokuyoshi2021SAA.pdf
 
-	// RB: compensate r_lightScale 3 and the division of Pi
+	//roughness = IsotropicNDFFiltering( localNormal, roughness * roughness );
+
+	float r2 = roughness * roughness;
+	roughness = AxisAlignedNDFFiltering( halfAngleVector, float2( r2, r2 ) ).x;
+#endif
+
+
+	// RB FIXME or not: compensate r_lightScale 3 and the division of Pi
 	//lambert *= 1.3;
+	// see http://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
+	//lambert /= PI;
 
 	// rpDiffuseModifier contains light color multiplier
 	float3 lightColor = sRGBToLinearRGB( lightProj.xyz * lightFalloff.xyz );
@@ -495,8 +525,8 @@ void main( PS_IN fragment, out PS_OUT result )
 	float vdotH = clamp( dot3( viewVector, halfAngleVector ), 0.0, 1.0 );
 	float ldotH = clamp( dot3( lightVector, halfAngleVector ), 0.0, 1.0 );
 
-	// compensate r_lightScale 3 * 2
-	float3 reflectColor = specularColor * rpSpecularModifier.rgb * 1.0;// * 0.5;
+	// keep in mind this is r_lightScale 3 * 2
+	float3 reflectColor = specularColor * rpSpecularModifier.rgb;
 
 	// cheap approximation by ARM with only one division
 	// http://community.arm.com/servlet/JiveServlet/download/96891546-19496/siggraph2015-mmg-renaldas-slides.pdf
@@ -508,16 +538,24 @@ void main( PS_IN fragment, out PS_OUT result )
 	// disney GGX
 	float D = ( hdotN * hdotN ) * ( rrrr - 1.0 ) + 1.0;
 	float VFapprox = ( ldotH * ldotH ) * ( roughness + 0.5 );
+
+#if KENNY_PBR
+	// specular cook-torrance brdf (visibility, geo and denom in one)
+	//float D = Distribution_GGX_Disney( hdotN, rr );
+	//float Vis = Visibility_Schlick( vdotN, lambert, rr );
+	//float3 F = Fresnel_Schlick( reflectColor, vdotH );
+	//float3 specularLight = D * Vis * F;
+
+	float3 specularLight = ( rrrr / ( 4.0 * D * D * VFapprox ) ) * ldotN * reflectColor;
+#else
 	float3 specularLight = ( rrrr / ( 4.0 * PI * D * D * VFapprox ) ) * ldotN * reflectColor;
-	//specularLight = float3( 0.0 );
+#endif
+
 
 #if 0
 	result.color = float4( _float3( VFapprox ), 1.0 );
 	return;
 #endif
-
-	// see http://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
-	//lambert /= PI;
 
 	//float3 diffuseColor = mix( diffuseMap, F0, metal ) * rpDiffuseModifier.xyz;
 	float3 diffuseLight = diffuseColor * lambert * ( rpDiffuseModifier.xyz );

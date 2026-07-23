@@ -3,6 +3,8 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
+Copyright (C) 2021 Justin Marshall
+Copyright (C) 2021-2024 Robert Beckebans
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -42,9 +44,9 @@ extern const idEventDef EV_Light_SetLightParm;
 extern const idEventDef EV_Light_SetLightParms;
 
 // jmarshall
-struct rvmLightStyleState_t
+struct iceLightStyleState_t
 {
-	rvmLightStyleState_t();
+	iceLightStyleState_t();
 
 	int				dl_frame;
 	float			dl_framef;
@@ -55,12 +57,12 @@ struct rvmLightStyleState_t
 	void			Reset();
 };
 
-ID_INLINE rvmLightStyleState_t::rvmLightStyleState_t()
+ID_INLINE iceLightStyleState_t::iceLightStyleState_t()
 {
 	Reset();
 }
 
-ID_INLINE void rvmLightStyleState_t::Reset()
+ID_INLINE void iceLightStyleState_t::Reset()
 {
 	dl_frame = 0;
 	dl_framef = 0;
@@ -71,6 +73,7 @@ ID_INLINE void rvmLightStyleState_t::Reset()
 // jmarshall end
 
 
+//class idStaticEntity;
 
 class idLight : public idEntity
 {
@@ -104,6 +107,7 @@ public:
 	{
 		return baseColor;
 	}
+	virtual idVec3	GetEditOrigin() const;
 	void			SetShader( const char* shadername );
 	void			SetLightParm( int parmnum, float value );
 	void			SetLightParms( float parm0, float parm1, float parm2, float parm3 );
@@ -173,6 +177,9 @@ private:
 	int				fadeEnd;
 	bool			soundWasPlaying;
 
+	// RB: pointing to static model because this light entity was split into 2 entities by convertMapToValve220
+	idEntityPtr<idStaticEntity> modelTarget;
+
 private:
 	void			PresentLightDefChange();
 	void			PresentModelDefChange();
@@ -191,10 +198,11 @@ private:
 	void			Event_SetSoundHandles();
 	void			Event_FadeOut( float time );
 	void			Event_FadeIn( float time );
+	void			Event_UpdateModelTarget();
 
 // jmarshall
 	idList<idStr>	light_styles;
-	rvmLightStyleState_t lightStyleState;
+	iceLightStyleState_t lightStyleState;
 // jmarshall end
 };
 

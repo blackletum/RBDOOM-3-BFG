@@ -211,19 +211,6 @@ void idMenuScreen_Shell_Root::ShowScreen( const mainMenuTransition_t transitionT
 
 			idMenuWidget_Button* buttonWidget = NULL;
 
-#if !defined ( ID_RETAIL )
-			option.Append( "DEV" );	// DEV
-			menuOptions.Append( option );
-			options->GetChildByIndex( index ).ClearEventActions();
-			options->GetChildByIndex( index ).AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, ROOT_CMD_DEV );
-			buttonWidget = dynamic_cast< idMenuWidget_Button* >( &options->GetChildByIndex( index ) );
-			if( buttonWidget != NULL )
-			{
-				buttonWidget->SetDescription( "View a list of maps available for play" );
-			}
-			index++;
-#endif
-
 			option.Clear();
 			option.Append( "#str_swf_campaign" );	// singleplayer
 			menuOptions.Append( option );
@@ -272,6 +259,22 @@ void idMenuScreen_Shell_Root::ShowScreen( const mainMenuTransition_t transitionT
 				buttonWidget->SetDescription( "#str_02219" );
 			}
 			index++;
+
+			// Leyland VR: moved DEV menu down
+#if !defined ( ID_RETAIL )
+			option.Clear();
+			option.Append( "DEV" );	// DEV
+			menuOptions.Append( option );
+			options->GetChildByIndex( index ).ClearEventActions();
+			options->GetChildByIndex( index ).AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, ROOT_CMD_DEV );
+			buttonWidget = dynamic_cast< idMenuWidget_Button* >( &options->GetChildByIndex( index ) );
+			if( buttonWidget != NULL )
+			{
+				buttonWidget->SetDescription( "View a list of maps available for play" );
+			}
+			index++;
+#endif
+			// Leyland end
 
 			// only add quit option for PC
 			option.Clear();
@@ -342,10 +345,12 @@ void idMenuScreen_Shell_Root::HandleExitGameBtn()
 			{
 				common->Quit();
 			}
+#if defined( USE_DOOMCLASSIC )
 			else if( accept == -1 )
 			{
 				session->MoveToPressStart();
 			}
+#endif
 			return idSWFScriptVar();
 		}
 	private:
@@ -357,10 +362,14 @@ void idMenuScreen_Shell_Root::HandleExitGameBtn()
 	idStaticList< idStrId, 4 > optionText;
 	callbacks.Append( new( TAG_SWF ) idSWFScriptFunction_QuitDialog( GDM_QUIT_GAME, 1 ) );
 	callbacks.Append( new( TAG_SWF ) idSWFScriptFunction_QuitDialog( GDM_QUIT_GAME, 0 ) );
+#if defined( USE_DOOMCLASSIC )
 	callbacks.Append( new( TAG_SWF ) idSWFScriptFunction_QuitDialog( GDM_QUIT_GAME, -1 ) );
+#endif
 	optionText.Append( idStrId( "#STR_SWF_ACCEPT" ) );
 	optionText.Append( idStrId( "#STR_SWF_CANCEL" ) );
+#if defined( USE_DOOMCLASSIC )
 	optionText.Append( idStrId( "#str_swf_change_game" ) );
+#endif
 
 	common->Dialog().AddDynamicDialog( GDM_QUIT_GAME, callbacks, optionText, true, "" );
 }
@@ -400,7 +409,6 @@ idMenuScreen_Shell_Root::HandleAction
 */
 bool idMenuScreen_Shell_Root::HandleAction( idWidgetAction& action, const idWidgetEvent& event, idMenuWidget* widget, bool forceHandled )
 {
-
 	if( menuData == NULL )
 	{
 		return true;
@@ -416,11 +424,13 @@ bool idMenuScreen_Shell_Root::HandleAction( idWidgetAction& action, const idWidg
 
 	switch( actionType )
 	{
+#if defined( USE_DOOMCLASSIC )
 		case WIDGET_ACTION_GO_BACK:
 		{
 			session->MoveToPressStart();
 			return true;
 		}
+#endif
 		case WIDGET_ACTION_PRESS_FOCUSED:
 		{
 			if( menuData->GetPlatform() == 2 )

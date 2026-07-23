@@ -47,14 +47,14 @@ struct DeviceCreationParameters
 {
 	bool startMaximized = false;
 	bool startFullscreen = false;
-	bool allowModeSwitch = true;
+	bool allowModeSwitch = false;
 	int windowPosX = -1;            // -1 means use default placement
 	int windowPosY = -1;
 	uint32_t backBufferWidth = 1280;
 	uint32_t backBufferHeight = 720;
 	uint32_t backBufferSampleCount = 1;  // optional HDR Framebuffer MSAA
 	uint32_t refreshRate = 0;
-	uint32_t swapChainBufferCount = 3;	// SRS - hardcode to 3 for Vsync modes and linux surfaceCaps.minImageCount = 3
+	uint32_t swapChainBufferCount = NUM_FRAME_DATA;	// SRS - default matches GPU frames, can be overridden by renderer
 	nvrhi::Format swapChainFormat = nvrhi::Format::RGBA8_UNORM; // RB: don't do the sRGB gamma ramp with the swapchain
 	uint32_t swapChainSampleCount = 1;
 	uint32_t swapChainSampleQuality = 0;
@@ -129,7 +129,7 @@ public:
 
 #if USE_VK && defined( VULKAN_USE_PLATFORM_SDL )
 	// SRS - Helper method for creating SDL Vulkan surface within DeviceManager_VK()
-	vk::Result CreateSDLWindowSurface( vk::Instance instance, vk::SurfaceKHR* surface );
+	VkResult CreateSDLWindowSurface( VkInstance instance, VkSurfaceKHR* surface );
 #endif
 
 	bool CreateWindowDeviceAndSwapChain( const glimpParms_t& params, const char* windowTitle );
@@ -146,6 +146,12 @@ public:
 
 	void UpdateWindowSize( const glimpParms_t& params );
 
+	// RB: for OpenVR to submit native Vulkan images
+	virtual int GetGraphicsFamilyIndex() const
+	{
+		return -1;
+	}
+
 protected:
 	friend class idRenderBackend;
 	friend class idImage;
@@ -153,7 +159,6 @@ protected:
 	void* windowInstance;
 	void* windowHandle;
 	bool m_windowVisible = false;
-	bool isNvidia = false;
 
 	DeviceCreationParameters m_DeviceParams;
 
@@ -164,6 +169,8 @@ protected:
 	uint32_t m_FrameIndex = 0;
 
 	DeviceManager() = default;
+
+	graphicsVendor_t getGPUVendor( uint32_t vendorID ) const;
 
 	void BackBufferResizing();
 	void BackBufferResized();

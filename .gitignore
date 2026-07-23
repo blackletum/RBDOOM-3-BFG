@@ -39,6 +39,10 @@ base/video/
 base/wads/
 base/renderprogs2/
 base/generated/
+base/env/
+base/screenshots/
+base/_tb/*.obj
+base/_tb/*.mtl
 
 GPATH
 GRTAGS
@@ -49,3 +53,8 @@ neo/.kdev4
 neo/neo.kdev4
 neo/.idea/
 neo/cmake-build-*/
+neo/bin/
+tools/
+neo/d3xp/gamesys/GameTypeInfo.h
+neo/d3xp/gamesys/GameTypeInfo.cpp
+

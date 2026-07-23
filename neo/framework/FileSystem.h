@@ -51,7 +51,14 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 static const ID_TIME_T	FILE_NOT_FOUND_TIMESTAMP	= ( ID_TIME_T ) - 1;
-static const int		MAX_OSPATH					= 256;
+
+// RB: bumped MAX_OSPATH to solve some problems with very long .bimage paths
+// Maximum path length limits:
+// Windows: 260 chars (default), up to 32,767 with "\\?\" prefix and Unicode APIs
+// Linux:   Typically 4096 chars (PATH_MAX), 255 per component (NAME_MAX)
+// macOS:   1024–4096 chars depending on file system, 255 per component
+static const int		MAX_OSPATH					= 1024;		// was 256 in BFG
+// RB end
 
 // modes for OpenFileByMode
 typedef enum
@@ -228,6 +235,7 @@ public:
 	virtual void			EndLevelLoad() = 0;
 	virtual bool			InProductionMode() = 0;
 	virtual bool			UsingResourceFiles() = 0;
+	virtual bool			UsingZipFiles() = 0; // RB
 	virtual void			UnloadMapResources( const char* name ) = 0;
 	virtual void			UnloadResourceContainer( const char* name ) = 0;
 	virtual void			StartPreload( const idStrList& _preload ) = 0;
@@ -244,6 +252,15 @@ public:
 	virtual void			AddParticlePreload( const char* resName ) = 0;
 	virtual void			AddCollisionPreload( const char* resName ) = 0;
 
+	// RB begin
+
+	// Returns true if Doom 2004 is detected
+	virtual bool			IsDoom2004() const = 0;
+
+	// Returns true if Doom 2019 is detected
+	// that one is BFG without Doom 1 & 2 and without multiplayer
+	virtual bool			IsDoom2019() const = 0;
+	// RB end
 };
 
 extern idFileSystem* 		fileSystem;

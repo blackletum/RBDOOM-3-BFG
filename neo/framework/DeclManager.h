@@ -129,6 +129,7 @@ public:
 	virtual size_t			Size() const = 0;
 	virtual void			List() const = 0;
 	virtual void			Print() const = 0;
+	virtual ID_TIME_T		GetSourceFileTimestamp() const = 0; // RB
 };
 
 
@@ -250,6 +251,12 @@ public:
 		return base->EverReferenced();
 	}
 
+	// Returns newest time stamp even if the file was changed since engine startup
+	ID_TIME_T			GetSourceFileTimestamp() const
+	{
+		return base->GetSourceFileTimestamp();
+	}
+
 public:
 	// Sets textSource to a default text if necessary.
 	// This may be overridden to provide a default definition based on the
@@ -334,6 +341,7 @@ public:
 
 	virtual void			Init() = 0;
 	virtual void			Init2() = 0;
+	virtual void			InitTool() = 0;
 	virtual void			Shutdown() = 0;
 	virtual void			Reload( bool force ) = 0;
 
@@ -394,12 +402,25 @@ public:
 
 	// Convenience functions for specific types.
 	virtual	const idMaterial* 		FindMaterial( const char* name, bool makeDefault = true ) = 0;
-	virtual const idDeclSkin* 		FindSkin( const char* name, bool makeDefault = true ) = 0;
-	virtual const idSoundShader* 	FindSound( const char* name, bool makeDefault = true ) = 0;
-
 	virtual const idMaterial* 		MaterialByIndex( int index, bool forceParse = true ) = 0;
-	virtual const idDeclSkin* 		SkinByIndex( int index, bool forceParse = true ) = 0;
-	virtual const idSoundShader* 	SoundByIndex( int index, bool forceParse = true ) = 0;
+
+	virtual const idDeclSkin* 		FindSkin( const char* name, bool makeDefault = true )
+	{
+		return NULL;
+	}
+	virtual const idSoundShader* 	FindSound( const char* name, bool makeDefault = true )
+	{
+		return NULL;
+	};
+
+	virtual const idDeclSkin* 		SkinByIndex( int index, bool forceParse = true )
+	{
+		return NULL;
+	};
+	virtual const idSoundShader* 	SoundByIndex( int index, bool forceParse = true )
+	{
+		return NULL;
+	};
 
 	virtual void					Touch( const idDecl* decl ) = 0;
 };

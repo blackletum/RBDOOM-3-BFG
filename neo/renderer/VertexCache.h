@@ -4,8 +4,8 @@
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
 Copyright (C) 2016-2017 Dustin Land
-Copyright (C) 2020 Robert Beckebans
 Copyright (C) 2022 Stephen Pridham
+Copyright (C) 2024 Robert Beckebans
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -31,9 +31,9 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __VERTEXCACHE_H__
 #define __VERTEXCACHE_H__
 
-#if 0
+#if 1
 
-	// RB: increased some static memory limits for custom modder content
+	// RB: quadruppled static memory limits for custom content
 
 	const int VERTCACHE_INDEX_MEMORY_PER_FRAME = 31 * 1024 * 1024;
 	const int VERTCACHE_VERTEX_MEMORY_PER_FRAME = 31 * 1024 * 1024;
@@ -52,7 +52,7 @@ If you have questions concerning this license or the applicable additional terms
 	const int VERTCACHE_SIZE_MASK = 0x7fffff;			// 23 bits = 8 megs
 
 	const int VERTCACHE_OFFSET_SHIFT = 24;
-	const int VERTCACHE_OFFSET_MASK = 0x1ffffff << 2;	// 27 bits = 128 megs
+	const int VERTCACHE_OFFSET_MASK = 0x7ffffff;		// 27 bits = 128 megs
 
 	const int VERTCACHE_FRAME_SHIFT = 51;
 	const int VERTCACHE_FRAME_MASK = 0x1fff;			// 13 bits = 8191 frames to wrap around
@@ -79,7 +79,7 @@ If you have questions concerning this license or the applicable additional terms
 	const int VERTCACHE_OFFSET_SHIFT = 24;
 	const int VERTCACHE_OFFSET_MASK = 0x1ffffff;	// 32 megs
 	const int VERTCACHE_FRAME_SHIFT = 49;
-	const int VERTCACHE_FRAME_MASK = 0x7fff;		// 15 bits = 32k frames to wrap around
+	const int VERTCACHE_FRAME_MASK = 0x7fff;		// 15 bits = 32k frames to wrap around, python hex( ( 1 << 15 ) - 1 )
 
 #endif
 

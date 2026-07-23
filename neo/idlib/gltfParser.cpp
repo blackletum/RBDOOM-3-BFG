@@ -37,7 +37,7 @@ If you have questions concerning this license or the applicable additional terms
 static const unsigned int gltfChunk_Type_JSON =  0x4E4F534A; //1313821514
 static const unsigned int gltfChunk_Type_BIN =  0x004E4942; //5130562
 
-idCVar gltf_parseVerbose( "gltf_parseVerbose", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "print gltf json data while parsing" );
+idCVar gltf_parseVerbose( "gltf_parseVerbose", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL | CVAR_NEW, "print gltf json data while parsing" );
 idCVar gltfParser_PrefixNodeWithID( "gltfParser_PrefixNodeWithID", "0", CVAR_SYSTEM | CVAR_BOOL, "The node's id is prefixed to the node's name during load" );
 //
 //gltf_sampler_wrap_type_map s_samplerWrapTypeMap[] = {
@@ -2362,7 +2362,7 @@ void gltfData::ClearData( idStr& fileName )
 #undef GLTFARRAYITEM
 #undef GLTFARRAYITEMREF
 
-CONSOLE_COMMAND_COMPILE( LoadGLTF, "Loads an .gltf or .glb file", idCmdSystem::ArgCompletion_MapName )
+CONSOLE_COMMAND( LoadGLTF, "Loads an .gltf or .glb file", idCmdSystem::ArgCompletion_MapName )
 {
 
 	if( args.Argc() > 1 )

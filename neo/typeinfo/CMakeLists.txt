@@ -22,6 +22,7 @@ set(TP_FRAMEWORK_INCLUDES
 	../framework/File.h
 	../framework/File_Manifest.h
 	../framework/File_Resource.h
+	../framework/File_Zip.h
 	../framework/FileSystem.h
 	../framework/Licensee.h
 	../idlib/precompiled.h
@@ -32,6 +33,7 @@ set(TP_FRAMEWORK_SOURCES
 	../framework/File.cpp
 	../framework/File_Manifest.cpp
 	../framework/File_Resource.cpp
+	../framework/File_Zip.cpp
 	../framework/FileSystem.cpp
 	)
 	
@@ -97,7 +99,7 @@ if(MSVC)
 
     add_executable(typeinfogen ${TP_SOURCES_ALL} ${TP_INCLUDES_ALL})
 	add_dependencies(typeinfogen idlib)
-	target_link_libraries(typeinfogen idlib winmm)
+	target_link_libraries(typeinfogen idlib winmm Shlwapi)
 	
 else()
 	if (USE_PRECOMPILED_HEADERS)

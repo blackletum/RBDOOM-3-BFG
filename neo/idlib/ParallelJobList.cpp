@@ -1145,8 +1145,6 @@ idJobThread::Run
 */
 int idJobThread::Run()
 {
-	OPTICK_THREAD( GetName() );
-
 	threadJobListState_t threadJobListState[MAX_JOBLISTS];
 	int numJobLists = 0;
 	int lastStalledJobList = -1;
@@ -1298,6 +1296,10 @@ public:
 	virtual idParallelJobList* 	GetJobList( int index );
 
 	virtual int					GetNumProcessingUnits();
+	virtual int					GetLogicalCpuCores() const	// RB
+	{
+		return numLogicalCpuCores;
+	}
 
 	virtual void				WaitForAllJobLists();
 
@@ -1488,6 +1490,12 @@ void idParallelJobManagerLocal::Submit( idParallelJobList_Threads* jobList, int 
 	else
 	{
 		numThreads = parallelism;
+	}
+
+	// RB: users might have processors these days with more than 32 logical cores
+	if( numThreads > MAX_JOB_THREADS )
+	{
+		numThreads = MAX_JOB_THREADS;
 	}
 
 	if( numThreads <= 0 )

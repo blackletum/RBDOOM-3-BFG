@@ -30,6 +30,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 #include "../RenderCommon.h"
+#include "../VertexCache.h"
+
+extern idVertexCache vertexCache;
 
 #include "sys/DeviceManager.h"
 
@@ -44,7 +47,7 @@ extern DeviceManager* deviceManager;
 
 extern VmaAllocator m_VmaAllocator;
 
-idCVar r_vmaAllocateBufferMemory( "r_vmaAllocateBufferMemory", "1", CVAR_BOOL | CVAR_INIT, "Use VMA allocator for buffer memory." );
+idCVar r_vmaAllocateBufferMemory( "r_vmaAllocateBufferMemory", "1", CVAR_BOOL | CVAR_INIT | CVAR_NEW, "Use VMA allocator for buffer memory." );
 
 /*
 ========================
@@ -70,59 +73,59 @@ pickBufferUsage - copied from nvrhi vulkan-buffer.cpp
 * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 * DEALINGS IN THE SOFTWARE.
 */
-vk::BufferUsageFlags pickBufferUsage( const nvrhi::BufferDesc& desc )
+VkBufferUsageFlags pickBufferUsage( const nvrhi::BufferDesc& desc )
 {
-	vk::BufferUsageFlags usageFlags = vk::BufferUsageFlagBits::eTransferSrc |
-									  vk::BufferUsageFlagBits::eTransferDst;
+	VkBufferUsageFlags usageFlags = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+									VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 	if( desc.isVertexBuffer )
 	{
-		usageFlags |= vk::BufferUsageFlagBits::eVertexBuffer;
+		usageFlags |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 	}
 
 	if( desc.isIndexBuffer )
 	{
-		usageFlags |= vk::BufferUsageFlagBits::eIndexBuffer;
+		usageFlags |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
 	}
 
 	if( desc.isDrawIndirectArgs )
 	{
-		usageFlags |= vk::BufferUsageFlagBits::eIndirectBuffer;
+		usageFlags |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
 	}
 
 	if( desc.isConstantBuffer )
 	{
-		usageFlags |= vk::BufferUsageFlagBits::eUniformBuffer;
+		usageFlags |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 	}
 
 	if( desc.structStride != 0 || desc.canHaveUAVs || desc.canHaveRawViews )
 	{
-		usageFlags |= vk::BufferUsageFlagBits::eStorageBuffer;
+		usageFlags |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 	}
 
 	if( desc.canHaveTypedViews )
 	{
-		usageFlags |= vk::BufferUsageFlagBits::eUniformTexelBuffer;
+		usageFlags |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
 	}
 
 	if( desc.canHaveTypedViews && desc.canHaveUAVs )
 	{
-		usageFlags |= vk::BufferUsageFlagBits::eStorageTexelBuffer;
+		usageFlags |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
 	}
 
 	if( desc.isAccelStructBuildInput )
 	{
-		usageFlags |= vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR;
+		usageFlags |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
 	}
 
 	if( desc.isAccelStructStorage )
 	{
-		usageFlags |= vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR;
+		usageFlags |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
 	}
 
 	if( deviceManager->IsVulkanDeviceExtensionEnabled( VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME ) )
 	{
-		usageFlags |= vk::BufferUsageFlagBits::eShaderDeviceAddress;
+		usageFlags |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 	}
 
 	return usageFlags;
@@ -185,24 +188,23 @@ bool idVertexBuffer::AllocBufferObject( const void* data, int allocSize, bufferU
 		idLib::Error( "idVertexBuffer::AllocBufferObject: allocSize = %i", allocSize );
 	}
 
-	size = allocSize;
+	size = ALIGN( allocSize, VERTEX_CACHE_ALIGN );
 	usage = _usage;
 
-	int numBytes = GetAllocedSize();
+	const int numBytes = GetAllocedSize();
 
 	nvrhi::BufferDesc vertexBufferDesc;
 	vertexBufferDesc.byteSize = numBytes;
 	vertexBufferDesc.isVertexBuffer = true;
+	vertexBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
 
 	if( usage == BU_DYNAMIC )
 	{
-		vertexBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
 		vertexBufferDesc.cpuAccess = nvrhi::CpuAccessMode::Write;
 		vertexBufferDesc.debugName = "Mapped idDrawVert vertex buffer";
 	}
 	else
 	{
-		vertexBufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
 		vertexBufferDesc.keepInitialState = true;
 		vertexBufferDesc.debugName = "Static idDrawVert vertex buffer";
 	}
@@ -212,7 +214,7 @@ bool idVertexBuffer::AllocBufferObject( const void* data, int allocSize, bufferU
 	{
 		VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
 		bufferCreateInfo.size = numBytes;
-		bufferCreateInfo.usage = static_cast< VkBufferUsageFlags >( pickBufferUsage( vertexBufferDesc ) );
+		bufferCreateInfo.usage = pickBufferUsage( vertexBufferDesc );
 		bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 		VmaAllocationCreateInfo allocCreateInfo = {};
@@ -307,13 +309,14 @@ void idVertexBuffer::Update( const void* data, int updateSize, int offset, bool 
 	assert( bufferHandle );
 	assert_16_byte_aligned( data );
 	assert( ( GetOffset() & 15 ) == 0 );
+	assert( ( offset & VERTEX_CACHE_ALIGN - 1 ) == 0 );
 
-	if( updateSize > GetSize() )
+	const int numBytes = ( updateSize + 15 ) & ~15;
+
+	if( offset + numBytes > GetSize() )
 	{
-		idLib::FatalError( "idVertexBuffer::Update: size overrun, %i > %i\n", updateSize, GetSize() );
+		idLib::FatalError( "idVertexBuffer::Update: size overrun, %i + %i > %i\n", offset, numBytes, GetSize() );
 	}
-
-	int numBytes = ( updateSize + 15 ) & ~15;
 
 	if( usage == BU_DYNAMIC )
 	{
@@ -450,10 +453,10 @@ bool idIndexBuffer::AllocBufferObject( const void* data, int allocSize, bufferUs
 		idLib::Error( "idIndexBuffer::AllocBufferObject: allocSize = %i", allocSize );
 	}
 
-	size = allocSize;
+	size = ALIGN( allocSize, INDEX_CACHE_ALIGN );
 	usage = _usage;
 
-	int numBytes = GetAllocedSize();
+	const int numBytes = GetAllocedSize();
 
 	nvrhi::BufferDesc indexBufferDesc;
 	indexBufferDesc.byteSize = numBytes;
@@ -479,7 +482,7 @@ bool idIndexBuffer::AllocBufferObject( const void* data, int allocSize, bufferUs
 	{
 		VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
 		bufferCreateInfo.size = numBytes;
-		bufferCreateInfo.usage = static_cast< VkBufferUsageFlags >( pickBufferUsage( indexBufferDesc ) );
+		bufferCreateInfo.usage = pickBufferUsage( indexBufferDesc );
 		bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 		VmaAllocationCreateInfo allocCreateInfo = {};
@@ -573,13 +576,14 @@ void idIndexBuffer::Update( const void* data, int updateSize, int offset, bool i
 	assert( bufferHandle );
 	assert_16_byte_aligned( data );
 	assert( ( GetOffset() & 15 ) == 0 );
-
-	if( updateSize > GetSize() )
-	{
-		idLib::FatalError( "idIndexBuffer::Update: size overrun, %i > %i\n", updateSize, GetSize() );
-	}
+	assert( ( offset & INDEX_CACHE_ALIGN - 1 ) == 0 );
 
 	const int numBytes = ( updateSize + 15 ) & ~15;
+
+	if( offset + numBytes > GetSize() )
+	{
+		idLib::FatalError( "idIndexBuffer::Update: size overrun, %i + %i > %i\n", offset, numBytes, GetSize() );
+	}
 
 	if( usage == BU_DYNAMIC )
 	{
@@ -717,7 +721,7 @@ bool idUniformBuffer::AllocBufferObject( const void* data, int allocSize, buffer
 		idLib::Error( "idUniformBuffer::AllocBufferObject: allocSize = %i", allocSize );
 	}
 
-	size = allocSize;
+	size = ALIGN( allocSize, vertexCache.uniformBufferOffsetAlignment );
 	usage = allocatedUsage;
 
 	const int numBytes = GetAllocedSize();
@@ -727,7 +731,6 @@ bool idUniformBuffer::AllocBufferObject( const void* data, int allocSize, buffer
 	nvrhi::BufferDesc bufferDesc;
 	//bufferDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;		// SRS - shouldn't this be initialized to CopyDest?
 	bufferDesc.initialState = nvrhi::ResourceStates::CopyDest;
-	//bufferDesc.keepInitialState = true;									// SRS - shouldn't this be set for BU_STATIC only?
 	bufferDesc.canHaveTypedViews = true;
 	bufferDesc.canHaveRawViews = true;
 	bufferDesc.byteSize = numBytes;
@@ -750,7 +753,7 @@ bool idUniformBuffer::AllocBufferObject( const void* data, int allocSize, buffer
 	{
 		VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
 		bufferCreateInfo.size = numBytes;
-		bufferCreateInfo.usage = static_cast< VkBufferUsageFlags >( pickBufferUsage( bufferDesc ) );
+		bufferCreateInfo.usage = pickBufferUsage( bufferDesc );
 		bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 		VmaAllocationCreateInfo allocCreateInfo = {};
@@ -845,13 +848,14 @@ void idUniformBuffer::Update( const void* data, int updateSize, int offset, bool
 	assert( bufferHandle );
 	assert_16_byte_aligned( data );
 	assert( ( GetOffset() & 15 ) == 0 );
+	assert( ( offset & vertexCache.uniformBufferOffsetAlignment - 1 ) == 0 );
 
-	if( updateSize > GetSize() )
+	const int numBytes = ( updateSize + 15 ) & ~15;
+
+	if( offset + numBytes > GetSize() )
 	{
-		idLib::FatalError( "idUniformBuffer::Update: size overrun, %i > %i\n", updateSize, GetSize() );
+		idLib::FatalError( "idUniformBuffer::Update: size overrun, %i + %i > %i\n", offset, numBytes, GetSize() );
 	}
-
-	int numBytes = ( updateSize + 15 ) & ~15;
 
 	if( usage == BU_DYNAMIC )
 	{

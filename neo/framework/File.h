@@ -332,7 +332,8 @@ private:
 
 class idFile_InZip : public idFile
 {
-	friend class			idFileSystemLocal;
+	//friend class			idFileSystemLocal;
+	friend class			idZipContainer;
 
 public:
 	idFile_InZip();
@@ -365,7 +366,6 @@ private:
 	void* 					z;				// unzip info
 };
 
-#if 1
 class idFile_InnerResource : public idFile
 {
 	friend class			idFileSystemLocal;
@@ -412,7 +412,6 @@ private:
 	int					internalFilePos;	// seek offset
 	byte* 				resourceBuffer;		// if using the temp save memory
 };
-#endif
 
 /*
 ================================================

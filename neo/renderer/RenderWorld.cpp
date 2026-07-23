@@ -4,7 +4,6 @@
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
 Copyright (C) 2014-2016 Robert Beckebans
-Copyright (C) 2014-2016 Kot in Action Creative Artel
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -166,7 +165,6 @@ idRenderWorldLocal::idRenderWorldLocal()
 		decals[i].entityHandle = -1;
 		decals[i].lastStartTime = 0;
 		decals[i].decals = new( TAG_MODEL ) idRenderModelDecal();
-		decals[i].decals->index = i;
 	}
 
 	for( int i = 0; i < overlays.Num(); i++ )
@@ -174,7 +172,6 @@ idRenderWorldLocal::idRenderWorldLocal()
 		overlays[i].entityHandle = -1;
 		overlays[i].lastStartTime = 0;
 		overlays[i].overlays = new( TAG_MODEL ) idRenderModelOverlay();
-		overlays[ i ].overlays->index = i;
 	}
 }
 
@@ -353,7 +350,6 @@ void idRenderWorldLocal::UpdateEntityDef( qhandle_t entityHandle, const renderEn
 	def->parms = *re;
 
 	def->lastModifiedFrameNum = tr.frameCount;
-	def->archived = false;
 
 	// optionally immediately issue any callbacks
 	if( !r_useEntityCallbacks.GetBool() && def->parms.callback != NULL )
@@ -399,11 +395,6 @@ void idRenderWorldLocal::FreeEntityDef( qhandle_t entityHandle )
 	}
 
 	R_FreeEntityDefDerivedData( def, false, false );
-
-	if( common->WriteDemo() && def->archived )
-	{
-		WriteFreeEntity( entityHandle );
-	}
 
 	// if we are playing a demo, these will have been freed
 	// in R_FreeEntityDefDerivedData(), otherwise the gui
@@ -506,7 +497,7 @@ void idRenderWorldLocal::UpdateLightDef( qhandle_t lightHandle, const renderLigh
 				rlight->parallel == light->parms.parallel && rlight->pointLight == light->parms.pointLight &&
 				rlight->right == light->parms.right && rlight->start == light->parms.start &&
 				rlight->target == light->parms.target && rlight->up == light->parms.up &&
-				rlight->shader == light->lightShader && rlight->prelightModel == light->parms.prelightModel )
+				rlight->shader == light->lightShader )
 		{
 			justUpdate = true;
 		}
@@ -529,22 +520,12 @@ void idRenderWorldLocal::UpdateLightDef( qhandle_t lightHandle, const renderLigh
 
 	light->parms = *rlight;
 	light->lastModifiedFrameNum = tr.frameCount;
-	if( common->WriteDemo() && light->archived )
-	{
-		WriteFreeLight( lightHandle );
-		light->archived = false;
-	}
 
 	// new for BFG edition: force noShadows on spectrum lights so teleport spawns
 	// don't cause such a slowdown.  Hell writing shouldn't be shadowed anyway...
 	if( light->parms.shader && light->parms.shader->Spectrum() )
 	{
 		light->parms.noShadows = true;
-	}
-
-	if( light->lightHasMoved )
-	{
-		light->parms.prelightModel = NULL;
 	}
 
 	if( !justUpdate )
@@ -579,11 +560,6 @@ void idRenderWorldLocal::FreeLightDef( qhandle_t lightHandle )
 	}
 
 	R_FreeLightDefDerivedData( light );
-
-	if( common->WriteDemo() && light->archived )
-	{
-		WriteFreeLight( lightHandle );
-	}
 
 	delete light;
 	lightDefs[lightHandle] = NULL;
@@ -690,15 +666,11 @@ void idRenderWorldLocal::UpdateEnvprobeDef( qhandle_t envprobeHandle, const rend
 
 		probe->world = this;
 		probe->index = envprobeHandle;
+		probe->viewCount = 0;
 	}
 
 	probe->parms = *ep;
 	probe->lastModifiedFrameNum = tr.frameCount;
-	if( common->WriteDemo() && probe->archived )
-	{
-		WriteFreeEnvprobe( envprobeHandle );
-		probe->archived = false;
-	}
 
 	if( !justUpdate )
 	{
@@ -732,11 +704,6 @@ void idRenderWorldLocal::FreeEnvprobeDef( qhandle_t envprobeHandle )
 	}
 
 	R_FreeEnvprobeDefDerivedData( probe );
-
-	if( common->WriteDemo() && probe->archived )
-	{
-		WriteFreeEnvprobe( envprobeHandle );
-	}
 
 	delete probe;
 	envprobeDefs[envprobeHandle] = NULL;
@@ -828,7 +795,6 @@ void idRenderWorldLocal::ProjectDecalOntoWorld( const idFixedWinding& winding, c
 				def->decals = AllocDecal( def->index, startTime );
 			}
 			def->decals->AddDeferredDecal( localParms );
-			def->archived = false;
 		}
 	}
 }
@@ -884,7 +850,6 @@ void idRenderWorldLocal::ProjectDecal( qhandle_t entityHandle, const idFixedWind
 		def->decals = AllocDecal( def->index, startTime );
 	}
 	def->decals->AddDeferredDecal( localParms );
-	def->archived = false;
 }
 
 /*
@@ -923,7 +888,6 @@ void idRenderWorldLocal::ProjectOverlay( qhandle_t entityHandle, const idPlane l
 		def->overlays = AllocOverlay( def->index, startTime );
 	}
 	def->overlays->AddDeferredOverlay( localParms );
-	def->archived = false;
 }
 
 /*
@@ -957,10 +921,7 @@ idRenderModelDecal* idRenderWorldLocal::AllocDecal( qhandle_t newEntityHandle, i
 	decals[oldest].entityHandle = newEntityHandle;
 	decals[oldest].lastStartTime = startTime;
 	decals[oldest].decals->ReUse();
-	if( common->WriteDemo() )
-	{
-		WriteFreeDecal( common->WriteDemo(), oldest );
-	}
+
 	return decals[oldest].decals;
 }
 
@@ -1148,13 +1109,6 @@ void idRenderWorldLocal::RenderScene( const renderView_t* renderView )
 
 	// render any post processing after the view and all its subviews has been draw
 	R_RenderPostProcess( parms );
-
-	// now write delete commands for any modified-but-not-visible entities, and
-	// add the renderView command to the demo
-	if( common->WriteDemo() )
-	{
-		WriteRenderView( renderView );
-	}
 
 #if 0
 	for( int i = 0; i < entityDefs.Num(); i++ )
@@ -2650,7 +2604,6 @@ R_RemapShaderBySkin
 */
 const idMaterial* R_RemapShaderBySkin( const idMaterial* shader, const idDeclSkin* skin, const idMaterial* customShader )
 {
-
 	if( !shader )
 	{
 		return NULL;

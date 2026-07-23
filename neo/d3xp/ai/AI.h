@@ -753,6 +753,7 @@ protected:
 	void					Event_TestMoveToPosition( const idVec3& position );
 	void					Event_TestMeleeAttack();
 	void					Event_TestAnimAttack( const char* animname );
+	void					Event_Shrivel( float shirvel_time );
 	void					Event_Burn();
 	void					Event_PreBurn();
 	void					Event_ClearBurn();
@@ -906,7 +907,7 @@ private:
 #include "../monsters/Monster_zombie_security_pistol.h"
 #include "../monsters/Monster_zombie_commando_tentacle.h"
 #include "../monsters/monster_zombie_commando_cgun.h"
-#include "../monsters/monster_turret.h"
+#include "../monsters/Monster_turret.h"
 
 #include "../bots/Bot.h"
 

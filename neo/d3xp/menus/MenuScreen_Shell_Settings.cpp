@@ -36,7 +36,9 @@ enum settingMenuCmds_t
 	SETTING_CMD_CONTROLS,
 	SETTING_CMD_GAMEPLAY,
 	SETTING_CMD_SYSTEM,
+#if VR_OPTIONS
 	SETTING_CMD_3D,
+#endif
 };
 
 /*
@@ -69,11 +71,13 @@ void idMenuScreen_Shell_Settings::Initialize( idMenuHandler* data )
 	menuOptions.Append( option );
 	option.Clear();
 
-	if( renderSystem->IsStereoScopicRenderingSupported() )
+#if VR_OPTIONS
+	//if( renderSystem->IsStereoScopicRenderingSupported() )
 	{
 		option.Append( "#str_swf_stereoscopics" );	// Stereoscopic Rendering
 		menuOptions.Append( option );
 	}
+#endif
 
 	options->SetListData( menuOptions );
 	options->SetNumVisibleOptions( NUM_SETTING_OPTIONS );
@@ -252,11 +256,13 @@ bool idMenuScreen_Shell_Settings::HandleAction( idWidgetAction& action, const id
 					menuData->SetNextScreen( SHELL_AREA_SYSTEM_OPTIONS, MENU_TRANSITION_SIMPLE );
 					break;
 				}
+#if VR_OPTIONS
 				case SETTING_CMD_3D:
 				{
 					menuData->SetNextScreen( SHELL_AREA_STEREOSCOPICS, MENU_TRANSITION_SIMPLE );
 					break;
 				}
+#endif
 			}
 
 			if( options != NULL )

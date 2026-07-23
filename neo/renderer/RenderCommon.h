@@ -52,34 +52,6 @@ const int FOG_ENTER_SIZE			= 64;
 const float FOG_ENTER				= ( FOG_ENTER_SIZE + 1.0f ) / ( FOG_ENTER_SIZE * 2 );
 
 
-enum demoCommand_t
-{
-	DC_BAD,
-	DC_RENDERVIEW,
-	DC_UPDATE_ENTITYDEF,
-	DC_DELETE_ENTITYDEF,
-	DC_UPDATE_LIGHTDEF,
-	DC_DELETE_LIGHTDEF,
-	DC_LOADMAP,
-	DC_CROP_RENDER,
-	DC_UNCROP_RENDER,
-	DC_CAPTURE_RENDER,
-	DC_END_FRAME,
-	DC_DEFINE_MODEL,
-	DC_SET_PORTAL_STATE,
-	DC_UPDATE_SOUNDOCCLUSION,
-	DC_GUI_MODEL,
-	DC_UPDATE_ENVPROBEDEF,
-	DC_DELETE_ENVPROBEDEF,
-	DC_UPDATE_DECAL,
-	DC_DELETE_DECAL,
-	DC_UPDATE_OVERLAY,
-	DC_DELETE_OVERLAY,
-	DC_CACHE_SKINS,
-	DC_CACHE_PARTICLES,
-	DC_CACHE_MATERIALS,
-};
-
 /*
 ==============================================================================
 
@@ -91,6 +63,15 @@ SURFACES
 #include "ModelDecal.h"
 #include "ModelOverlay.h"
 #include "Interaction.h"
+
+// RB begin
+#define MOC_MULTITHREADED 0
+
+#if MOC_MULTITHREADED
+	class CullingThreadpool;
+#endif
+class MaskedOcclusionCulling;
+// RB end
 
 class idRenderWorldLocal;
 struct viewEntity_t;
@@ -117,10 +98,11 @@ struct drawSurf_t
 	const idMaterial* 		material;			// may be NULL for shadow volumes
 	uint64					extraGLState;		// Extra GL state |'d with material->stage[].drawStateBits
 	float					sort;				// material->sort, modified by gui / entity sort offsets
-	const float* 				shaderRegisters;	// evaluated and adjusted for referenceShaders
+	const float* 			shaderRegisters;	// evaluated and adjusted for referenceShaders
 	drawSurf_t* 			nextOnLight;		// viewLight chains
 	drawSurf_t** 			linkChain;			// defer linking to lights to a serial section to avoid a mutex
 	idScreenRect			scissorRect;		// for scissor clipping, local inside renderView viewport
+	const struct portalArea_s*	area;			// RB: if != NULL then the area provides valid lightgrid
 };
 
 // areas have references to hold all the lights and entities in them
@@ -212,8 +194,6 @@ public:
 	int						lastModifiedFrameNum;	// to determine if it is constantly changing,
 	// and should go in the dynamic frame memory, or kept
 	// in the cached memory
-	bool					archived;				// for demo writing
-
 
 	// derived information
 	idPlane					lightProject[4];		// old style light projection where Z and W are flipped and projected lights lightProject[3] is divided by ( zNear + zFar )
@@ -262,18 +242,13 @@ public:
 	int							lastModifiedFrameNum;	// to determine if it is constantly changing,
 	// and should go in the dynamic frame memory, or kept
 	// in the cached memory
-	bool						archived;				// for demo writing
 
 	// derived information
-	//idPlane						lightProject[4];		// old style light projection where Z and W are flipped and projected lights lightProject[3] is divided by ( zNear + zFar )
-	//idRenderMatrix				baseLightProject;		// global xyz1 to projected light strq
 	idRenderMatrix				inverseBaseProbeProject;// transforms the zero-to-one cube to exactly cover the light in world space
 
 	idBounds					globalProbeBounds;
 
 	areaReference_t* 			references;				// each area the light is present in will have a lightRef
-	//idInteraction* 			firstInteraction;		// doubly linked list
-	//idInteraction* 			lastInteraction;
 
 	idImage* 					irradianceImage;		// cubemap image used for diffuse IBL by backend
 	idImage* 					radianceImage;			// cubemap image used for specular IBL by backend
@@ -300,8 +275,6 @@ public:
 	virtual void			RemoveDecals();
 
 	bool					IsDirectlyVisible() const;
-	void					ReadFromDemoFile( class idDemoFile* f );
-	void					WriteToDemoFile( class idDemoFile* f ) const;
 	renderEntity_t			parms;
 
 	float					modelMatrix[16];		// this is just a rearrangement of parms.axis and parms.origin
@@ -314,13 +287,11 @@ public:
 	int						lastModifiedFrameNum;	// to determine if it is constantly changing,
 	// and should go in the dynamic frame memory, or kept
 	// in the cached memory
-	bool					archived;				// for demo writing
 
 	idRenderModel* 			dynamicModel;			// if parms.model->IsDynamicModel(), this is the generated data
 	int						dynamicModelFrameCount;	// continuously animating dynamic models will recreate
 	// dynamicModel if this doesn't == tr.viewCount
 	idRenderModel* 			cachedDynamicModel;
-
 
 	// the local bounds used to place entityRefs, either from parms for dynamic entities, or a model bounds
 	idBounds				localReferenceBounds;
@@ -452,17 +423,6 @@ struct viewEntity_t
 	// parallelAddModels will build a chain of surfaces here that will need to
 	// be linked to the lights or added to the drawsurf list in a serial code section
 	drawSurf_t* 			drawSurfs;
-
-	// RB: use light grid of the best area this entity is in
-	bool					useLightGrid;
-	idImage* 				lightGridAtlasImage;
-	int						lightGridAtlasSingleProbeSize; // including border
-	int						lightGridAtlasBorderSize;
-
-	idVec3					lightGridOrigin;
-	idVec3					lightGridSize;
-	int						lightGridBounds[3];
-	// RB end
 };
 
 // RB: viewEnvprobes are allocated on the frame temporary stack memory
@@ -511,7 +471,7 @@ struct calcEnvprobeParms_t
 	idStr							filename;
 
 	// output
-	halfFloat_t*					outBuffer;				// HDR R11G11B11F packed octahedron atlas
+	halfFloat_t*					outBuffer;				// HDR RGB16F packed octahedron atlas
 	int								time;					// execution time in milliseconds
 };
 
@@ -535,7 +495,7 @@ struct calcLightGridPointParms_t
 	SphericalHarmonicsT<idVec3, 4>	shRadiance;				// L4 Spherical Harmonics
 #endif
 
-	halfFloat_t*					outBuffer;				// HDR R11G11B11F octahedron LIGHTGRID_IRRADIANCE_SIZE^2
+	halfFloat_t*					outBuffer;				// HDR RGB16F octahedron LIGHTGRID_IRRADIANCE_SIZE^2
 	int								time;					// execution time in milliseconds
 };
 // RB end
@@ -653,14 +613,17 @@ struct viewDef_t
 	// RB: collect environment probes like lights
 	viewEnvprobe_t*		viewEnvprobes;
 
-	// RB: nearest probe for now
+	// RB: nearest 3 probes for now
 	idBounds			globalProbeBounds;
 	idRenderMatrix		inverseBaseEnvProbeProject;	// the matrix for deforming the 'zeroOneCubeModel' to exactly cover the environent probe volume in world space
 	idImage* 			irradianceImage;			// cubemap image used for diffuse IBL by backend
 	idImage* 			radianceImages[3];			// cubemap image used for specular IBL by backend
 	idVec4				radianceImageBlends;		// blending weights
+	idVec4				probePositions[3];			// only used by parallax correction
 
 	Framebuffer*		targetRender;				// SP: The framebuffer to render to
+
+	int					taaFrameCount;				// RB: so we have the same frame index in frontend and backend
 };
 
 
@@ -699,11 +662,12 @@ TR_CMDS
 enum renderCommand_t
 {
 	RC_NOP,
-	RC_DRAW_VIEW_3D,	// may be at a reduced resolution, will be upsampled before 2D GUIs
-	RC_DRAW_VIEW_GUI,	// not resolution scaled
+	RC_DRAW_VIEW_3D,		// may be at a reduced resolution, will be upsampled before 2D GUIs
+	RC_DRAW_VIEW_GUI,		// not resolution scaled
 	RC_SET_BUFFER,
 	RC_COPY_RENDER,
-	RC_POST_PROCESS,
+	RC_POST_PROCESS,		// postfx after scene rendering is done but before GUI rendering
+	RC_CRT_POST_PROCESS,	// CRT simulation after everything has been rendered on the final swapchain image
 };
 
 struct emptyCommand_t
@@ -744,6 +708,13 @@ struct postProcessCommand_t
 	renderCommand_t		commandId;
 	renderCommand_t* 	next;
 	viewDef_t* 			viewDef;
+};
+
+struct crtPostProcessCommand_t
+{
+	renderCommand_t		commandId;
+	renderCommand_t* 	next;
+	int					padding;
 };
 
 //=======================================================================
@@ -843,15 +814,24 @@ enum bindingLayoutType_t
 	BINDING_LAYOUT_NORMAL_CUBE,
 	BINDING_LAYOUT_NORMAL_CUBE_SKINNED,
 
+	BINDING_LAYOUT_OCTAHEDRON_CUBE,
+	BINDING_LAYOUT_OCTAHEDRON_CUBE_SKINNED,
+
 	// NO GPU SKINNING ANYMORE
 	BINDING_LAYOUT_POST_PROCESS_INGAME,
 	BINDING_LAYOUT_POST_PROCESS_FINAL,
+	BINDING_LAYOUT_POST_PROCESS_FINAL2,
+	BINDING_LAYOUT_POST_PROCESS_CRT,
 
 	BINDING_LAYOUT_BLIT,
 	BINDING_LAYOUT_DRAW_AO,
 	BINDING_LAYOUT_DRAW_AO1,
 
 	BINDING_LAYOUT_BINK_VIDEO,
+
+	// SMAA
+	BINDING_LAYOUT_SMAA_EDGE_DETECTION,
+	BINDING_LAYOUT_SMAA_WEIGHT_CALC,
 
 	// NVRHI render passes specific
 	BINDING_LAYOUT_TAA_MOTION_VECTORS,
@@ -894,13 +874,10 @@ public:
 	virtual void			ShutdownOpenGL();
 	virtual bool			IsOpenGLRunning() const;
 	virtual bool			IsFullScreen() const;
-	virtual stereo3DMode_t	GetStereo3DMode() const;
-	virtual bool			HasQuadBufferSupport() const;
-	virtual bool			IsStereoScopicRenderingSupported() const;
-	virtual stereo3DMode_t	GetStereoScopicRenderingMode() const;
-	virtual void			EnableStereoScopicRendering( const stereo3DMode_t mode ) const;
 	virtual int				GetWidth() const;
 	virtual int				GetHeight() const;
+	virtual int				GetNativeWidth() const;
+	virtual int				GetNativeHeight() const;
 	virtual int				GetVirtualWidth() const;
 	virtual int				GetVirtualHeight() const;
 	virtual float			GetPixelAspect() const;
@@ -932,12 +909,11 @@ public:
 	virtual void			DrawBigChar( int x, int y, int ch );
 	virtual void			DrawBigStringExt( int x, int y, const char* string, const idVec4& setColor, bool forceColor );
 
-	virtual void			WriteDemoPics();
-	virtual void			WriteEndFrame();
-	virtual void			DrawDemoPics();
-	virtual const emptyCommand_t* 	SwapCommandBuffers( uint64* frontEndMicroSec, uint64* backEndMicroSec, uint64* shadowMicroSec, uint64* gpuMicroSec, backEndCounters_t* bc, performanceCounters_t* pc );
+	virtual void			DrawCRTPostFX(); // RB
 
-	virtual void					SwapCommandBuffers_FinishRendering( uint64* frontEndMicroSec, uint64* backEndMicroSec, uint64* shadowMicroSec, uint64* gpuMicroSec, backEndCounters_t* bc, performanceCounters_t* pc );
+	virtual const emptyCommand_t* 	SwapCommandBuffers( uint64* frontEndMicroSec, uint64* backEndMicroSec, uint64* mocMicroSec, uint64* gpuMicroSec, backEndCounters_t* bc, performanceCounters_t* pc );
+
+	virtual void					SwapCommandBuffers_FinishRendering( uint64* frontEndMicroSec, uint64* backEndMicroSec, uint64* mocMicroSec, uint64* gpuMicroSec, backEndCounters_t* bc, performanceCounters_t* pc );
 	virtual const emptyCommand_t* 	SwapCommandBuffers_FinishCommandBuffers();
 
 	virtual void			RenderCommandBuffers( const emptyCommand_t* commandBuffers );
@@ -950,7 +926,6 @@ public:
 	virtual void			CropRenderSize( int width, int height );
 	virtual void            CropRenderSize( int x, int y, int width, int height, bool topLeftAncor );
 	virtual void			CaptureRenderToImage( const char* imageName, bool clearColorAfterCopy = false );
-	virtual void			CaptureRenderToFile( const char* fileName, bool fixAlpha );
 	virtual void			UnCrop();
 	virtual bool			UploadImage( const char* imageName, const byte* data, int width, int height );
 
@@ -975,8 +950,6 @@ public:
 	// internal functions
 	idRenderSystemLocal();
 	~idRenderSystemLocal();
-
-	void					UpdateStereo3DMode();
 
 	void					Clear();
 	void					GetCroppedViewport( idScreenRect* viewport );
@@ -1067,6 +1040,17 @@ public:
 	idList<calcLightGridPointParms_t*>	lightGridJobs;
 
 	idRenderBackend			backend;
+
+#if defined(USE_INTRINSICS_SSE)
+
+#if MOC_MULTITHREADED
+	CullingThreadpool*		maskedOcclusionThreaded;
+#endif
+	MaskedOcclusionCulling*	maskedOcclusionCulling;
+	idVec4					maskedUnitCubeVerts[8];
+	idVec4					maskedZeroOneCubeVerts[8];
+	unsigned int			maskedZeroOneCubeIndexes[36];
+#endif
 
 private:
 	bool					bInitialized;
@@ -1166,7 +1150,6 @@ extern idCVar r_showUnsmoothedTangents;		// highlight geometry rendered with uns
 extern idCVar r_showSilhouette;				// highlight edges that are casting shadow planes
 extern idCVar r_showVertexColor;			// draws all triangles with the solid vertex color
 extern idCVar r_showUpdates;				// report entity and light updates and ref counts
-extern idCVar r_showDemo;					// report reads and writes to the demo file
 extern idCVar r_showDynamic;				// report stats on dynamic surface generation
 extern idCVar r_showIntensity;				// draw the screen colors based on intensity, red = 0, green = 128, blue = 255
 extern idCVar r_showTrace;					// show the intersection of an eye trace with the world
@@ -1207,8 +1190,6 @@ extern idCVar r_singleEntity;				// suppress all but one entity
 extern idCVar r_singleEnvprobe;				// suppress all but one envprobe
 extern idCVar r_singleArea;					// only draw the portal area the view is actually in
 extern idCVar r_singleSurface;				// suppress all but one surface on each entity
-extern idCVar r_shadowPolygonOffset;		// bias value added to depth test for stencil shadow drawing
-extern idCVar r_shadowPolygonFactor;		// scale value for stencil shadow drawing
 
 extern idCVar r_orderIndexes;				// perform index reorganization to optimize vertex use
 
@@ -1224,9 +1205,9 @@ extern idCVar r_debugRenderToTexture;
 extern idCVar stereoRender_enable;
 extern idCVar stereoRender_deGhost;			// subtract from opposite eye to reduce ghosting
 
+// RB begin
 extern idCVar r_useGPUSkinning;
 
-// RB begin
 extern idCVar r_shadowMapAtlasSize;
 extern idCVar r_shadowMapFrustumFOV;
 extern idCVar r_shadowMapSingleSide;
@@ -1240,7 +1221,8 @@ extern idCVar r_shadowMapSplitWeight;
 extern idCVar r_shadowMapLodScale;
 extern idCVar r_shadowMapLodBias;
 extern idCVar r_shadowMapPolygonFactor;
-extern idCVar r_shadowMapPolygonOffset;
+extern idCVar r_dxShadowMapPolygonOffset;
+extern idCVar r_vkShadowMapPolygonOffset;
 extern idCVar r_shadowMapOccluderFacing;
 extern idCVar r_shadowMapRegularDepthBiasScale;
 extern idCVar r_shadowMapSunDepthBiasScale;
@@ -1259,7 +1241,6 @@ extern idCVar r_hdrDebug;
 extern idCVar r_ldrContrastThreshold;
 extern idCVar r_ldrContrastOffset;
 
-extern idCVar r_useFilmicPostProcessing;
 extern idCVar r_forceAmbient;
 
 extern idCVar r_useSSAO;
@@ -1267,7 +1248,6 @@ extern idCVar r_ssaoDebug;
 extern idCVar r_ssaoFiltering;
 extern idCVar r_useHierarchicalDepthBuffer;
 
-extern idCVar r_usePBR;
 extern idCVar r_pbrDebug;
 extern idCVar r_showViewEnvprobes;
 extern idCVar r_showLightGrid;				// show Quake 3 style light grid points
@@ -1276,6 +1256,13 @@ extern idCVar r_useLightGrid;
 
 extern idCVar r_exposure;
 
+extern idCVar r_useSSR;
+extern idCVar r_ssrJitter;
+extern idCVar r_ssrMaxDistance;
+extern idCVar r_ssrMaxSteps;
+extern idCVar r_ssrStride;
+extern idCVar r_ssrZThickness;
+
 extern idCVar r_useTemporalAA;
 extern idCVar r_taaJitter;
 extern idCVar r_taaEnableHistoryClamping;
@@ -1283,6 +1270,35 @@ extern idCVar r_taaClampingFactor;
 extern idCVar r_taaNewFrameWeight;
 extern idCVar r_taaMaxRadiance;
 extern idCVar r_taaMotionVectors;
+
+extern idCVar r_useFilmicPostFX;
+extern idCVar r_useCRTPostFX;
+extern idCVar r_crtCurvature;
+extern idCVar r_crtVignette;
+
+extern idCVar r_useMaskedOcclusionCulling;
+
+enum RenderMode
+{
+	RENDERMODE_DOOM,
+	RENDERMODE_2BIT,
+	RENDERMODE_2BIT_HIGHRES,
+	RENDERMODE_C64,
+	RENDERMODE_C64_HIGHRES,
+	RENDERMODE_CPC,
+	RENDERMODE_CPC_HIGHRES,
+	RENDERMODE_GENESIS,
+	RENDERMODE_GENESIS_HIGHRES,
+	RENDERMODE_PSX,
+};
+
+extern idCVar r_retroDitherScale;
+
+extern idCVar r_renderMode;
+extern idCVar image_pixelLook;
+
+extern idCVar r_psxVertexJitter;
+extern idCVar r_psxAffineTextures;
 // RB end
 
 /*
@@ -1293,7 +1309,11 @@ INITIALIZATION
 ====================================================================
 */
 
+bool R_UsePixelatedLook();
+
 bool R_UseTemporalAA();
+
+bool R_UseHiZ();
 
 uint R_GetMSAASamples();
 
@@ -1359,7 +1379,6 @@ struct glimpParms_t
 	int			fullScreen;		// 0 = windowed, otherwise 1 based monitor number to go full screen on
 	// -1 = borderless window for spanning multiple displays
 	bool		startMaximized = false;
-	bool		stereo;
 	int			displayHz;
 	int			multiSamples;
 };
@@ -1387,8 +1406,8 @@ bool		VKimp_Init( glimpParms_t parms );
 bool		VKimp_SetScreenParms( glimpParms_t parms );
 
 // Destroys the rendering context, closes the window, resets the resolution,
-// and resets the gamma ramps.
-void		VKimp_Shutdown();
+// and resets the gamma ramps.  SRS - Optionally shuts down SDL for quit.
+void		VKimp_Shutdown( bool shutdownSDL );
 
 // Sets the hardware gamma ramps for gamma and brightness adjustment.
 // These are now taken as 16 bit values, so we can take full advantage
@@ -1543,6 +1562,16 @@ void R_LinkDrawSurfToView( drawSurf_t* drawSurf, viewDef_t* viewDef );
 void R_AddModels();
 
 /*
+============================================================
+
+TR_FRONTEND_MASKED_OCCLUSION_CULLING
+
+============================================================
+*/
+
+void R_FillMaskedOcclusionBufferWithModels( viewDef_t* viewDef );
+
+/*
 =============================================================
 
 TR_FRONTEND_DEFORM
@@ -1592,6 +1621,11 @@ void				R_AllocStaticTriSurfDominantTris( srfTriangles_t* tri, int numVerts );
 void				R_AllocStaticTriSurfMirroredVerts( srfTriangles_t* tri, int numMirroredVerts );
 void				R_AllocStaticTriSurfDupVerts( srfTriangles_t* tri, int numDupVerts );
 
+// RB begin
+void				R_AllocStaticTriSurfMocIndexes( srfTriangles_t* tri, int numIndexes );
+void				R_AllocStaticTriSurfMocVerts( srfTriangles_t* tri, int numVerts );
+// RB end
+
 srfTriangles_t* 	R_CopyStaticTriSurf( const srfTriangles_t* tri );
 
 void				R_ResizeStaticTriSurfVerts( srfTriangles_t* tri, int numVerts );
@@ -1608,6 +1642,7 @@ int					R_TriSurfMemory( const srfTriangles_t* tri );
 void				R_BoundTriSurf( srfTriangles_t* tri );
 void				R_RemoveDuplicatedTriangles( srfTriangles_t* tri );
 void				R_CreateSilIndexes( srfTriangles_t* tri );
+void				R_CreateMaskedOcclusionCullingTris( srfTriangles_t* tri ); // RB
 void				R_RemoveDegenerateTriangles( srfTriangles_t* tri );
 void				R_RemoveUnusedVerts( srfTriangles_t* tri );
 void				R_RangeCheckIndexes( const srfTriangles_t* tri );
@@ -1633,6 +1668,7 @@ void				R_CreateStaticBuffersForTri( srfTriangles_t& tri, nvrhi::ICommandList* c
 
 // RB
 idVec3				R_ClosestPointPointTriangle( const idVec3& point, const idVec3& vertex1, const idVec3& vertex2, const idVec3& vertex3 );
+idVec3				R_ClosestPointOnLineSegment( const idVec3& point, const idVec3& lineStart, const idVec3& lineEnd, float& t );
 
 // deformable meshes precalculate as much as possible from a base frame, then generate
 // complete srfTriangles_t from just a new set of vertexes

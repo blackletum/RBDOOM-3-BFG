@@ -125,11 +125,11 @@ void idCommonLocal::VPrintf( const char* fmt, va_list args )
 		int	t = Sys_Milliseconds();
 		if( com_timestampPrints.GetInteger() == 1 )
 		{
-			sprintf( msg, "[%5.2f]", t * 0.001f );
+			idStr::snPrintf( msg, sizeof( msg ), "[%5.2f]", t * 0.001f );
 		}
 		else
 		{
-			sprintf( msg, "[%i]", t );
+			idStr::snPrintf( msg, sizeof( msg ), "[%i]", t );
 		}
 	}
 	timeLength = strlen( msg );
@@ -276,6 +276,26 @@ A raw string should NEVER be passed as fmt, because of "%f" type crashers.
 */
 void idCommonLocal::Printf( const char* fmt, ... )
 {
+	va_list argptr;
+	va_start( argptr, fmt );
+	VPrintf( fmt, argptr );
+	va_end( argptr );
+}
+
+/*
+==================
+idCommonLocal::Printf
+
+RB: only for dmap and AAS builder
+==================
+*/
+void idCommonLocal::VerbosePrintf( const char* fmt, ... )
+{
+	if( !dmap_verbose.GetBool() )
+	{
+		return;
+	}
+
 	va_list argptr;
 	va_start( argptr, fmt );
 	VPrintf( fmt, argptr );

@@ -987,8 +987,8 @@ void idGameLocal::ClientReadSnapshot( const idSnapShot& ss )
 
 			ent->FlagNewSnapshot();
 
-			// read the class specific data from the snapshot
-			if( msg.GetRemainingReadBits() > 0 )
+			// read the class specific data from the snapshot; SRS - only if network-synced
+			if( msg.GetRemainingReadBits() > 0 && ent->fl.networkSync )
 			{
 				ent->ReadFromSnapshot_Ex( msg );
 				ent->snapshotBits = msg.GetSize();
@@ -1236,8 +1236,6 @@ void idGameLocal::ClientRunFrame( idUserCmdMgr& cmdMgr, bool lastPredictFrame, g
 
 	slow.Set( time, previousTime, realClientTime );
 	fast.Set( time, previousTime, realClientTime );
-
-	DemoWriteGameInfo();
 
 	// run prediction on all active entities
 	for( ent = activeEntities.Next(); ent != NULL; ent = ent->activeNode.Next() )

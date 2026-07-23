@@ -7,11 +7,19 @@ astyle.exe -v --formatted --options=astyle-options.ini --recursive ../doomclassi
 REM astyle.exe -v --formatted --options=astyle-options.ini --recursive libs/imgui/*.h
 REM astyle.exe -v --formatted --options=astyle-options.ini --recursive libs/imgui/*.cpp
 
+astyle.exe -v --formatted --options=astyle-options.ini --recursive libs/moc/*.h
+astyle.exe -v --formatted --options=astyle-options.ini --recursive libs/moc/*.inl
+astyle.exe -v --formatted --options=astyle-options.ini --recursive libs/moc/*.cpp
+
 REM astyle.exe -v --formatted --options=astyle-options.ini --recursive libs/stb/*.h
 REM astyle.exe -v --formatted --options=astyle-options.ini --recursive libs/tinyexr/*.h
 
 REM astyle.exe -v --formatted --options=astyle-options.ini --recursive libs/oggvorbis/*.h
 REM astyle.exe -v --formatted --options=astyle-options.ini --recursive libs/oggvorbis/*.c
+
+REM astyle.exe -v --formatted --options=astyle-options.ini --recursive libs/zlib/*.h
+REM astyle.exe -v --formatted --options=astyle-options.ini --recursive libs/zlib/*.c
+REM astyle.exe -v --formatted --options=astyle-options.ini --recursive libs/zlib/*.cpp
 
 astyle.exe -v -Q --options=astyle-options.ini --recursive shaders/*.hlsl
 

@@ -429,7 +429,6 @@ idPlayerView::SingleView
 */
 void idPlayerView::SingleView( const renderView_t* view, idMenuHandler_HUD* hudManager )
 {
-
 	// normal rendering
 	if( !view )
 	{
@@ -666,25 +665,13 @@ void idPlayerView::ScreenFade()
 	}
 }
 
-idCVar	stereoRender_interOccularCentimeters( "stereoRender_interOccularCentimeters", "3.0", CVAR_ARCHIVE | CVAR_RENDERER, "Distance between eyes" );
+idCVar	stereoRender_interOccularCentimeters( "stereoRender_interOccularCentimeters", "6.5", CVAR_ARCHIVE | CVAR_RENDERER, "Distance between eyes" );
 idCVar	stereoRender_convergence( "stereoRender_convergence", "6", CVAR_RENDERER, "0 = head mounted display, otherwise world units to convergence plane" );
 
 extern	idCVar stereoRender_screenSeparation;	// screen units from center to eyes
 extern	idCVar stereoRender_swapEyes;
 
-// In a head mounted display with separate displays for each eye,
-// screen separation will be zero and world separation will be the eye distance.
-struct stereoDistances_t
-{
-	// Offset to projection matrix, positive one eye, negative the other.
-	// Total distance is twice this, so 0.05 would give a 10% of screen width
-	// separation for objects at infinity.
-	float	screenSeparation;
 
-	// Game world units from one eye to the centerline.
-	// Total distance is twice this.
-	float	worldSeparation;
-};
 
 float CentimetersToInches( const float cm )
 {
@@ -783,10 +770,6 @@ The crosshair is swapped for a laser sight in stereo rendering
 */
 bool	IsGameStereoRendered()
 {
-	if( renderSystem->GetStereo3DMode() != STEREO3D_OFF )
-	{
-		return true;
-	}
 	return false;
 }
 
@@ -803,6 +786,7 @@ idPlayerView::RenderPlayerView
 void idPlayerView::RenderPlayerView( idMenuHandler_HUD* hudManager )
 {
 	const renderView_t* view = player->GetRenderView();
+#if 0
 	if( renderSystem->GetStereo3DMode() != STEREO3D_OFF )
 	{
 		// render both eye views each frame on the PC
@@ -812,6 +796,7 @@ void idPlayerView::RenderPlayerView( idMenuHandler_HUD* hudManager )
 		}
 	}
 	else
+#endif
 	{
 		SingleView( view, hudManager );
 	}
@@ -1075,8 +1060,8 @@ void FullscreenFX_Helltime::AccumPass( const renderView_t* view )
 
 	renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
 
-	float t0 = 1.0f;
-	float t1 = 0.0f;
+	float t0 = 0.0f;
+	float t1 = 1.0f;
 
 	// capture pass
 	if( clearAccumBuffer )
@@ -1097,8 +1082,8 @@ FullscreenFX_Helltime::HighQuality
 */
 void FullscreenFX_Helltime::HighQuality()
 {
-	float t0 = 1.0f;
-	float t1 = 0.0f;
+	float t0 = 0.0f;
+	float t1 = 1.0f;
 
 	renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
 	renderSystem->DrawStretchPic( 0.0f, 0.0f, renderSystem->GetVirtualWidth(), renderSystem->GetVirtualHeight(), 0.0f, t0, 1.0f, t1, drawMaterial );
@@ -1200,8 +1185,8 @@ void FullscreenFX_Multiplayer::AccumPass( const renderView_t* view )
 {
 	renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
 
-	float t0 = 1.0f;
-	float t1 = 0.0f;
+	float t0 = 0.0f;
+	float t1 = 1.0f;
 
 	// capture pass
 	if( clearAccumBuffer )
@@ -1222,8 +1207,8 @@ FullscreenFX_Multiplayer::HighQuality
 */
 void FullscreenFX_Multiplayer::HighQuality()
 {
-	float t0 = 1.0f;
-	float t1 = 0.0f;
+	float t0 = 0.0f;
+	float t1 = 1.0f;
 
 	renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
 	renderSystem->DrawStretchPic( 0.0f, 0.0f, renderSystem->GetVirtualWidth(), renderSystem->GetVirtualHeight(), 0.0f, t0, 1.0f, t1, drawMaterial );
@@ -1323,27 +1308,27 @@ void FullscreenFX_Warp::DrawWarp( WarpPolygon_t wp, float interp )
 	drawPts[0].Set( trans.outer1.x, trans.outer1.y );
 	drawPts[1].Set( mid2.x, mid2.y );
 	drawPts[2].Set( mid1.x, mid1.y );
-	drawPts[3].Set( trans.outer1.z, trans.outer1.w );
-	drawPts[4].Set( mid2_uv.z, mid2_uv.w );
-	drawPts[5].Set( mid1_uv.z, mid1_uv.w );
+	drawPts[3].Set( trans.outer1.z, 1 - trans.outer1.w );
+	drawPts[4].Set( mid2_uv.z, 1 - mid2_uv.w );
+	drawPts[5].Set( mid1_uv.z, 1 - mid1_uv.w );
 	renderSystem->DrawStretchTri( drawPts[0], drawPts[1], drawPts[2], drawPts[3], drawPts[4], drawPts[5], material );
 
 	// draw [outer1, outer2, mid2]
 	drawPts[0].Set( trans.outer1.x, trans.outer1.y );
 	drawPts[1].Set( trans.outer2.x, trans.outer2.y );
 	drawPts[2].Set( mid2.x, mid2.y );
-	drawPts[3].Set( trans.outer1.z, trans.outer1.w );
-	drawPts[4].Set( trans.outer2.z, trans.outer2.w );
-	drawPts[5].Set( mid2_uv.z, mid2_uv.w );
+	drawPts[3].Set( trans.outer1.z, 1 - trans.outer1.w );
+	drawPts[4].Set( trans.outer2.z, 1 - trans.outer2.w );
+	drawPts[5].Set( mid2_uv.z, 1 - mid2_uv.w );
 	renderSystem->DrawStretchTri( drawPts[0], drawPts[1], drawPts[2], drawPts[3], drawPts[4], drawPts[5], material );
 
 	// draw [mid1, mid2, center]
 	drawPts[0].Set( mid1.x, mid1.y );
 	drawPts[1].Set( mid2.x, mid2.y );
 	drawPts[2].Set( trans.center.x, trans.center.y );
-	drawPts[3].Set( mid1_uv.z, mid1_uv.w );
-	drawPts[4].Set( mid2_uv.z, mid2_uv.w );
-	drawPts[5].Set( trans.center.z, trans.center.w );
+	drawPts[3].Set( mid1_uv.z, 1 - mid1_uv.w );
+	drawPts[4].Set( mid2_uv.z, 1 - mid2_uv.w );
+	drawPts[5].Set( trans.center.z, 1 - trans.center.w );
 	renderSystem->DrawStretchTri( drawPts[0], drawPts[1], drawPts[2], drawPts[3], drawPts[4], drawPts[5], material );
 }
 
@@ -1439,9 +1424,9 @@ void FullscreenFX_EnviroSuit::HighQuality()
 {
 	renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
 	float s0 = 0.0f;
-	float t0 = 1.0f;
+	float t0 = 0.0f;
 	float s1 = 1.0f;
-	float t1 = 0.0f;
+	float t1 = 1.0f;
 	renderSystem->DrawStretchPic( 0.0f, 0.0f, renderSystem->GetVirtualWidth(), renderSystem->GetVirtualHeight(), s0, t0, s1, t1, material );
 }
 
@@ -1527,9 +1512,9 @@ void FullscreenFX_DoubleVision::HighQuality()
 
 	// uv coordinates
 	float s0 = shift;
-	float t0 = 1.0f;
+	float t0 = 0.0f;
 	float s1 = 1.0f;
-	float t1 = 0.0f;
+	float t1 = 1.0f;
 
 
 	renderSystem->SetColor4( color.x, color.y, color.z, 1.0f );
@@ -1537,9 +1522,9 @@ void FullscreenFX_DoubleVision::HighQuality()
 
 	renderSystem->SetColor4( color.x, color.y, color.z, 0.5f );
 	s0 = 0.0f;
-	t0 = 1.0f;
+	t0 = 0.0f;
 	s1 = ( 1.0 - shift );
-	t1 = 0.0f;
+	t1 = 1.0f;
 
 	renderSystem->DrawStretchPic( 0.0f, 0.0f, renderSystem->GetVirtualWidth(), renderSystem->GetVirtualHeight(), s0, t0, s1, t1, material );
 }
@@ -1884,9 +1869,9 @@ void FullscreenFXManager::Blendback( float alpha )
 	{
 		renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f - alpha );
 		float s0 = 0.0f;
-		float t0 = 1.0f;
+		float t0 = 0.0f;
 		float s1 = 1.0f;
-		float t1 = 0.0f;
+		float t1 = 1.0f;
 		renderSystem->DrawStretchPic( 0.0f, 0.0f, renderSystem->GetVirtualWidth(), renderSystem->GetVirtualHeight(), s0, t0, s1, t1, blendBackMaterial );
 	}
 }
@@ -1947,9 +1932,6 @@ void FullscreenFXManager::Process( const renderView_t* view )
 		return;
 	}
 
-// RB: skip for now so the game is playable. These old effects really suck with modern APIs
-#if !defined( USE_NVRHI )
-
 	// do the process
 	for( int i = 0; i < fx.Num(); i++ )
 	{
@@ -1977,9 +1959,10 @@ void FullscreenFXManager::Process( const renderView_t* view )
 			// handle the accum pass if we have one
 			if( pfx->HasAccum() )
 			{
-				// we need to crop the accum pass
-				renderSystem->CropRenderSize( 512, 512 );
 				pfx->AccumPass( view );
+				// we need to crop the accum pass
+				//
+				renderSystem->CropRenderSize( 512, 512 );
 				renderSystem->CaptureRenderToImage( "_accum" );
 				renderSystem->UnCrop();
 			}
@@ -1991,7 +1974,6 @@ void FullscreenFXManager::Process( const renderView_t* view )
 			Blendback( pfx->GetFadeAlpha() );
 		}
 	}
-#endif
 }
 
 

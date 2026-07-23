@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2012-2014 Robert Beckebans
+Copyright (C) 2012-2025 Robert Beckebans
 Copyright (C) 2022 Stephen Pridham
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
@@ -63,7 +63,7 @@ struct version_s
 {
 	version_s()
 	{
-		sprintf( string, "%s.%d%s %s %s %s", ENGINE_VERSION, BUILD_NUMBER, BUILD_DEBUG, BUILD_STRING, __DATE__, __TIME__ );
+		idStr::snPrintf( string, sizeof( string ), "%s.%d%s %s %s %s", ENGINE_VERSION, BUILD_NUMBER, BUILD_DEBUG, BUILD_STRING, __DATE__, __TIME__ );
 	}
 	char	string[256];
 } version;
@@ -71,7 +71,8 @@ struct version_s
 idCVar com_version( "si_version", version.string, CVAR_SYSTEM | CVAR_ROM | CVAR_SERVERINFO, "engine version" );
 idCVar com_forceGenericSIMD( "com_forceGenericSIMD", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "force generic platform independent SIMD" );
 
-#ifdef ID_RETAIL
+// RB: not allowing the console is a bit harsh for shipping builds
+#if 0 //def ID_RETAIL
 	idCVar com_allowConsole( "com_allowConsole", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_INIT, "allow toggling console with the tilde key" );
 #else
 	idCVar com_allowConsole( "com_allowConsole", "1", CVAR_BOOL | CVAR_SYSTEM | CVAR_INIT, "allow toggling console with the tilde key" );
@@ -96,12 +97,13 @@ idCVar net_inviteOnly( "net_inviteOnly", "1", CVAR_BOOL | CVAR_ARCHIVE, "whether
 // DG: add cvar for pause
 idCVar com_pause( "com_pause", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "set to 1 to pause game, to 0 to unpause again" );
 // DG end
+idCVar com_activeApp( "com_activeApp", "1", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "this is set to 0 if running in background" );
 
 extern idCVar g_demoMode;
 
 idCVar com_engineHz( "com_engineHz", "60", CVAR_FLOAT | CVAR_ARCHIVE, "Frames per second the engine runs at", 10.0f, 1024.0f );
 float com_engineHz_latched = 60.0f; // Latched version of cvar, updated between map loads
-int64 com_engineHz_numerator = 100LL * 1000LL;
+const int64 com_engineHz_numerator = 100LL * 1000LL;
 int64 com_engineHz_denominator = 100LL * 60LL;
 
 // RB begin
@@ -120,8 +122,11 @@ int com_editors = 0;
 idCommonLocal	commonLocal;
 idCommon* 		common = &commonLocal;
 
-// RB: defaulted this to 1 because we don't have a sound for the intro .bik video
-idCVar com_skipIntroVideos( "com_skipIntroVideos", "1", CVAR_BOOL , "skips intro videos" );
+#if defined( ID_RETAIL )
+	idCVar com_skipIntroVideos( "com_skipIntroVideos", "0", CVAR_BOOL , "skips intro videos" );
+#else
+	idCVar com_skipIntroVideos( "com_skipIntroVideos", "1", CVAR_BOOL , "skips intro videos" );
+#endif
 
 // For doom classic
 struct Globals;
@@ -194,8 +199,6 @@ idCommonLocal::idCommonLocal() :
 	renderWorld = NULL;
 	soundWorld = NULL;
 	menuSoundWorld = NULL;
-	readDemo = NULL;
-	writeDemo = NULL;
 
 	gameFrame = 0;
 	gameTimeResidual = 0;
@@ -221,7 +224,6 @@ idCommonLocal::Quit
 */
 void idCommonLocal::Quit()
 {
-
 	// don't try to shutdown if we are in a recursive error
 	if( !com_errorEntered )
 	{
@@ -646,7 +648,7 @@ Com_WriteConfig_f
 Write the config file to a specific name
 ===============
 */
-CONSOLE_COMMAND( writeConfig, "writes a config file", NULL )
+CONSOLE_COMMAND_SHIP( writeConfig, "writes a config file", NULL )
 {
 	idStr	filename;
 
@@ -895,11 +897,11 @@ void idCommonLocal::RenderSplash()
 	renderSystem->SetColor4( 1, 1, 1, 1 );
 	renderSystem->DrawStretchPic( barWidth, barHeight, renderSystem->GetVirtualWidth() - barWidth * 2.0f, renderSystem->GetVirtualHeight() - barHeight * 2.0f, 0, 0, 1, 1, splashScreen );
 
-	const emptyCommand_t* cmd = renderSystem->SwapCommandBuffers( &time_frontend, &time_backend, &time_shadows, &time_gpu, &stats_backend, &stats_frontend );
+	const emptyCommand_t* cmd = renderSystem->SwapCommandBuffers( &time_frontend, &time_backend, &time_moc, &time_gpu, &stats_backend, &stats_frontend );
 	renderSystem->RenderCommandBuffers( cmd );
 
 	// RB: this is the same as Doom 3 renderSystem->EndFrame()
-	//renderSystem->SwapCommandBuffers_FinishRendering( &time_frontend, &time_backend, &time_shadows, &time_gpu );
+	//renderSystem->SwapCommandBuffers_FinishRendering( &time_frontend, &time_backend, &time_moc, &time_gpu );
 }
 
 /*
@@ -920,6 +922,7 @@ void idCommonLocal::RenderBink( const char* path )
 	materialText.Format( "{ translucent { videoMap %s } }", path );
 
 	idMaterial* material = const_cast<idMaterial*>( declManager->FindMaterial( "splashbink" ) );
+	material->FreeData();	// SRS - always free data before parsing, otherwise leaks occur
 	material->Parse( materialText.c_str(), materialText.Length(), false );
 	material->ResetCinematicTime( Sys_Milliseconds() );
 
@@ -931,7 +934,7 @@ void idCommonLocal::RenderBink( const char* path )
 	while( ( Sys_Milliseconds() <= ( material->GetCinematicStartTime() + cinematicLength ) ) && material->CinematicIsPlaying() )
 	{
 		renderSystem->DrawStretchPic( chop, 0, imageWidth, renderSystem->GetVirtualHeight(), 0, 0, 1, 1, material );
-		const emptyCommand_t* cmd = renderSystem->SwapCommandBuffers( &time_frontend, &time_backend, &time_shadows, &time_gpu, &stats_backend, &stats_frontend );
+		const emptyCommand_t* cmd = renderSystem->SwapCommandBuffers( &time_frontend, &time_backend, &time_moc, &time_gpu, &stats_backend, &stats_frontend );
 		renderSystem->RenderCommandBuffers( cmd );
 
 		Sys_GenerateEvents();
@@ -1788,12 +1791,11 @@ idCommonLocal::ProcessEvent
 bool idCommonLocal::ProcessEvent( const sysEvent_t* event )
 {
 	// hitting escape anywhere brings up the menu
-	// SRS - allow escape during demo playback to cancel
-	if( game && ( game->IsInGame() || readDemo ) )
+	if( game && game->IsInGame() )
 	{
 		if( event->evType == SE_KEY && event->evValue2 == 1 && ( event->evValue == K_ESCAPE || event->evValue == K_JOY9 ) )
 		{
-			if( game->CheckInCinematic() == true )
+			if( game->CheckInCinematic() )
 			{
 				game->SkipCinematicScene();
 			}
@@ -1809,15 +1811,7 @@ bool idCommonLocal::ProcessEvent( const sysEvent_t* event )
 
 					console->Close();
 
-					// SRS - cancel demo playback and return to the main menu
-					if( readDemo )
-					{
-						LeaveGame();
-					}
-					else
-					{
-						StartMenu();
-					}
+					StartMenu();
 					return true;
 				}
 				else
@@ -1960,8 +1954,6 @@ void idCommonLocal::PerformGameSwitch()
 	{
 		return;
 	}
-
-	const int DOOM_CLASSIC_HZ = 35;
 
 	if( idealCurrentGame == DOOM_CLASSIC || idealCurrentGame == DOOM2_CLASSIC )
 	{

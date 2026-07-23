@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 2022 Harrie van Ginneken
-Copyright (C) 2022 Robert Beckebans
+Copyright (C) 2022-2025 Robert Beckebans
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -32,7 +32,6 @@ If you have questions concerning this license or the applicable additional terms
 
 // files import as y-up. Use this transform to change the model to z-up.
 static const idMat4 blenderToDoomTransform( idAngles( 0.0f, 0.0f, 90 ).ToMat3(), vec3_origin );
-//static const idMat4 blenderToDoomTransform = mat4_identity;
 
 MapPolygonMesh* MapPolygonMesh::ConvertFromMeshGltf( const gltfMesh_Primitive* prim, gltfData* _data , const idMat4& transform )
 {
@@ -153,14 +152,11 @@ MapPolygonMesh* MapPolygonMesh::ConvertFromMeshGltf( const gltfMesh_Primitive* p
 						bin.Seek( attrBv->byteStride - ( attrib->elementSize * attrAcc->typeSize ), FS_SEEK_CUR );
 					}
 
-					idVec3 normal;
+					// w = 0 because we only want to rotate the normal
+					idVec4 normal4D( vec.x, vec.y, vec.z, 0.0f );
+					normal4D *= transform;
 
-					normal.x = vec.x;
-					normal.y = vec.y;
-					normal.z = vec.z;
-
-					normal *= transform;
-
+					idVec3 normal = normal4D.ToVec3();
 					// renormalize because previous transforms may contain scale operations
 					normal.Normalize();
 
@@ -203,13 +199,10 @@ MapPolygonMesh* MapPolygonMesh::ConvertFromMeshGltf( const gltfMesh_Primitive* p
 						bin.Seek( attrBv->byteStride - ( attrib->elementSize * attrAcc->typeSize ), FS_SEEK_CUR );
 					}
 
-					idVec3 tangent;
+					idVec4 tangent4D( vec.x, vec.y, vec.z, 0.0f );
+					tangent4D *= transform;
 
-					tangent.x = vec.x;
-					tangent.y = vec.y;
-					tangent.z = vec.z;
-
-					tangent *= transform;
+					idVec3 tangent = tangent4D.ToVec3();
 					tangent.Normalize();
 
 					mesh->verts[i].SetTangent( tangent );
@@ -415,7 +408,7 @@ static void AddMeshesToWorldspawn_r( idMapEntity* entity, gltfNode* node, const 
 	}
 };
 
-void ResolveLight( gltfData* data, idMapEntity* newEntity, gltfNode* node )
+static void ResolveLight( gltfData* data, idMapEntity* newEntity, gltfNode* node )
 {
 	assert( node && node->extensions.KHR_lights_punctual );
 
@@ -432,6 +425,8 @@ void ResolveLight( gltfData* data, idMapEntity* newEntity, gltfNode* node )
 	}
 
 	assert( light );
+
+	newEntity->epairs.Set( "classname", "light" );
 
 	//newEntity->epairs.SetMatrix( "rotation", mat3_default );
 	newEntity->epairs.SetVector( "_color", light->color );
@@ -450,8 +445,19 @@ void ResolveLight( gltfData* data, idMapEntity* newEntity, gltfNode* node )
 
 		case gltfExt_KHR_lights_punctual::Point:
 		{
-			newEntity->epairs.SetVector( "light_radius", idVec3( light->range ) );
-			newEntity->epairs.Set( "texture", "lights/defaultpointlight" );
+			float radius = 300;
+			if( light->range != -1 )
+			{
+				radius = light->range;
+			}
+
+			newEntity->epairs.SetVector( "light_radius", idVec3( radius ) );
+
+			idStr texture;
+			if( !newEntity->epairs.GetString( "texture", "", texture ) )
+			{
+				newEntity->epairs.Set( "texture", "lights/biground1" );
+			}
 			break;
 		}
 
@@ -471,7 +477,12 @@ void ResolveLight( gltfData* data, idMapEntity* newEntity, gltfNode* node )
 			newEntity->epairs.SetVector( "light_up", axis[2] * fov );
 			newEntity->epairs.SetVector( "light_start", axis[0] * 16 );
 			newEntity->epairs.SetVector( "light_end", axis[0] * ( light->range - 16 ) );
-			newEntity->epairs.Set( "texture", "lights/spot01" );
+
+			idStr texture;
+			if( !newEntity->epairs.GetString( "texture", "", texture ) )
+			{
+				newEntity->epairs.Set( "texture", "lights/spot01" );
+			}
 			break;
 		}
 
@@ -481,7 +492,7 @@ void ResolveLight( gltfData* data, idMapEntity* newEntity, gltfNode* node )
 
 }
 
-void ResolveEntity( gltfData* data, idMapEntity* newEntity, gltfNode* node )
+static void ResolveEntity( gltfData* data, idMapEntity* newEntity, gltfNode* node )
 {
 	const char* classname = node->extras.strPairs.GetString( "classname" );
 
@@ -521,9 +532,11 @@ void ResolveEntity( gltfData* data, idMapEntity* newEntity, gltfNode* node )
 	if( node->extensions.KHR_lights_punctual != nullptr )
 	{
 		ResolveLight( data, newEntity, node );
+		return;
 	}
 
 	// HarrievG: TODO cleanup this was done by try & error until it worked
+#if 0
 	if( node->camera >= 0 && !newEntity->epairs.FindKey( "rotation" ) )
 	{
 		idQuat q = entityToWorldTransform.ToMat3().ToQuat();
@@ -533,7 +546,7 @@ void ResolveEntity( gltfData* data, idMapEntity* newEntity, gltfNode* node )
 	else if( idStr::Icmp( classname, "info_player_start" ) == 0 && !newEntity->epairs.FindKey( "rotation" ) )
 	{
 		idQuat q = entityToWorldTransform.ToMat3().ToQuat();
-		q = idAngles( -90.0f, 0.0, -90.0f ).ToQuat() * q * blenderToDoomTransform.ToMat3().ToQuat();
+		q = idAngles( 90.0f, 0.0, -90.0f ).ToQuat() * q * blenderToDoomTransform.ToMat3().ToQuat();
 		newEntity->epairs.SetMatrix( "rotation",  q.ToMat3() );
 	}
 	else if( node->extras.strPairs.GetBool( "useNodeOrientation", false ) )
@@ -549,6 +562,24 @@ void ResolveEntity( gltfData* data, idMapEntity* newEntity, gltfNode* node )
 		//idMat3 rot = ( blenderToDoomTransform * entityToWorldTransform ).ToMat3();
 		newEntity->epairs.SetMatrix( "rotation", rot );
 	}
+#else
+	if( node->camera >= 0 && !newEntity->epairs.FindKey( "rotation" ) )
+	{
+		idQuat q = entityToWorldTransform.ToMat3().ToQuat();
+		q = idAngles( 90.0f, 0.0, -90.0f ).ToQuat() * q * blenderToDoomTransform.ToMat3().ToQuat();
+		newEntity->epairs.SetMatrix( "rotation", q.ToMat3() );
+	}
+	else
+	{
+		idQuat q = entityToWorldTransform.ToMat3().ToQuat();
+		q = idAngles( 0.0f, 0.0f, -90.0f ).ToQuat() * q * blenderToDoomTransform.ToMat3().ToQuat();
+		newEntity->epairs.SetMatrix( "rotation",  q.ToMat3() );
+
+		// FIXME this should be
+		//idMat3 rot = ( blenderToDoomTransform * entityToWorldTransform ).ToMat3();
+		//newEntity->epairs.SetMatrix( "rotation",  rot );
+	}
+#endif
 
 #if 0
 	for( int i = 0; i < newEntity->epairs.GetNumKeyVals(); i++ )
@@ -560,20 +591,23 @@ void ResolveEntity( gltfData* data, idMapEntity* newEntity, gltfNode* node )
 #endif
 }
 
-int FindEntities( gltfData* data, idMapEntity::EntityListRef entities, gltfNode* node , idDict epairs , idMapEntity* worldspawn )
+static int FindEntities_r( gltfData* data, idMapEntity::EntityListRef entities, gltfNode* node , idDict epairs , idMapEntity* worldspawn )
 {
 	int entityCount = 0;
 
 	const char* classname = node->extras.strPairs.GetString( "classname" );
 
 	// skip all nodes with "worldspawn." or "BSP" in the name
-	if( idStr::Icmpn( node->name, "BSP", 3 ) != 0
-			&& idStr::Icmpn( node->name, "worldspawn.", 11 ) != 0 )
+	if( idStr::Icmpn( node->name, "BSP", 3 ) == 0 || idStr::Icmpn( node->name, "worldspawn.", 11 ) == 0 )
+	{
+		AddMeshesToWorldspawn_r( worldspawn, node, mat4_identity, data );
+	}
+	else
 	{
 		idStr classnameStr = node->extras.strPairs.GetString( "classname" );
 
-		// skip everything that is not an entity
-		if( !classnameStr.IsEmpty() )
+		// skip everything that is not an entity except lights
+		if( !classnameStr.IsEmpty() || node->extensions.KHR_lights_punctual )
 		{
 			auto* newEntity = new( TAG_IDLIB_GLTF ) idMapEntity();
 			entities.Append( newEntity );
@@ -592,14 +626,10 @@ int FindEntities( gltfData* data, idMapEntity::EntityListRef entities, gltfNode*
 			}
 		}
 	}
-	else
-	{
-		AddMeshesToWorldspawn_r( worldspawn, node, mat4_identity, data );
-	}
 
 	for( auto& child : node->children )
 	{
-		entityCount += FindEntities( data, entities, data->NodeList()[child], epairs , worldspawn );
+		entityCount += FindEntities_r( data, entities, data->NodeList()[child], epairs , worldspawn );
 	}
 
 	return entityCount;
@@ -636,10 +666,18 @@ int idMapEntity::GetEntities( gltfData* data, EntityListRef entities, int sceneI
 			else
 			{
 				idStr classnameStr = node->extras.strPairs.GetString( "classname" );
-				bool skipInline = !node->extras.strPairs.GetBool( "inline", true );
+				idStr model = node->extras.strPairs.GetString( "model" );
+
+				// inline should be false by default because drag n drop in the asset browser in Blender is Append by default
+				// however it would break previous maps
+
+				// in Doom 3 maps inline entities have as model key the same name as the entity name
+				const bool defaultInline = ( idStr::Icmp( model.c_str(), node->name.c_str() ) == 0 );
+				bool skipInline = !node->extras.strPairs.GetBool( "inline", defaultInline );
 				idDict epairs;
-				// skip everything that is not an entity
-				if( !classnameStr.IsEmpty() )
+
+				// skip everything that is not an entity except lights
+				if( !classnameStr.IsEmpty() || node->extensions.KHR_lights_punctual )
 				{
 					idMapEntity* newEntity = new( TAG_IDLIB_GLTF ) idMapEntity();
 					entities.Append( newEntity );
@@ -665,10 +703,11 @@ int idMapEntity::GetEntities( gltfData* data, EntityListRef entities, int sceneI
 						epairs.Copy( node->extras.strPairs );
 					}
 				}
+
 				// add entities from all subnodes
 				for( auto& child : node->children )
 				{
-					entityCount += FindEntities( data, entities, data->NodeList()[child] , epairs, worldspawn );
+					entityCount += FindEntities_r( data, entities, data->NodeList()[child] , epairs, worldspawn );
 				}
 			}
 		}

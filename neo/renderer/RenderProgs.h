@@ -151,6 +151,9 @@ enum renderParm_t
 	RENDERPARM_GLOBALLIGHTORIGIN,
 	RENDERPARM_JITTERTEXSCALE,
 	RENDERPARM_JITTERTEXOFFSET,
+
+	RENDERPARM_PSX_DISTORTIONS,
+
 	RENDERPARM_CASCADEDISTANCES,
 
 	RENDERPARM_SHADOW_MATRIX_0_X,	// rpShadowMatrices[6 * 4]
@@ -350,10 +353,15 @@ enum
 	BUILTIN_DEBUG_OCTAHEDRON,
 	BUILTIN_DEBUG_OCTAHEDRON_SKINNED,
 	// RB end
+
 	BUILTIN_ENVIRONMENT,
 	BUILTIN_ENVIRONMENT_SKINNED,
 	BUILTIN_BUMPY_ENVIRONMENT,
 	BUILTIN_BUMPY_ENVIRONMENT_SKINNED,
+	BUILTIN_BUMPY_ENVIRONMENT2,				// RB
+	BUILTIN_BUMPY_ENVIRONMENT2_SKINNED,		// RB
+	BUILTIN_BUMPY_ENVIRONMENT2_SSR,			// RB
+	BUILTIN_BUMPY_ENVIRONMENT2_SSR_SKINNED,	// RB
 
 	BUILTIN_DEPTH,
 	BUILTIN_DEPTH_SKINNED,
@@ -366,6 +374,14 @@ enum
 	BUILTIN_WOBBLESKY,
 	BUILTIN_POSTPROCESS,
 	// RB begin
+	BUILTIN_POSTPROCESS_RETRO_2BIT,		// CGA, Gameboy, cool for Gamejams
+	BUILTIN_POSTPROCESS_RETRO_C64,		// Commodore 64
+	BUILTIN_POSTPROCESS_RETRO_CPC,		// Amstrad 6128
+	BUILTIN_POSTPROCESS_RETRO_GENESIS,	// Sega Genesis / Megadrive
+	BUILTIN_POSTPROCESS_RETRO_PSX,		// Sony Playstation 1
+	BUILTIN_CRT_MATTIAS,
+	BUILTIN_CRT_NUPIXIE,
+	BUILTIN_CRT_EASYMODE,
 	BUILTIN_SCREEN,
 	BUILTIN_TONEMAP,
 	BUILTIN_BRIGHTPASS,
@@ -430,8 +446,8 @@ public:
 
 	void	StartFrame();
 
-	void	SetRenderParm( renderParm_t rp, const float* value );
-	void	SetRenderParms( renderParm_t rp, const float* values, int numValues );
+	void	SetRenderParm( renderParm_t rp, const float value[4] );
+	void	SetRenderParms( renderParm_t rp, const float values[], int numValues );
 
 	int		FindShader( const char* name, rpStage_t stage );
 	int		FindShader( const char* name, rpStage_t stage, const char* nameOutSuffix, uint32 features, bool builtin, vertexLayoutType_t vertexLayout = LAYOUT_DRAW_VERT );
@@ -762,6 +778,26 @@ public:
 		BindShader_Builtin( BUILTIN_BUMPY_ENVIRONMENT_SKINNED );
 	}
 
+	void	BindShader_BumpyEnvironment2()
+	{
+		BindShader_Builtin( BUILTIN_BUMPY_ENVIRONMENT2 );
+	}
+
+	void	BindShader_BumpyEnvironment2Skinned()
+	{
+		BindShader_Builtin( BUILTIN_BUMPY_ENVIRONMENT2_SKINNED );
+	}
+
+	void	BindShader_BumpyEnvironment2_SSR()
+	{
+		BindShader_Builtin( BUILTIN_BUMPY_ENVIRONMENT2_SSR );
+	}
+
+	void	BindShader_BumpyEnvironment2_SSR_Skinned()
+	{
+		BindShader_Builtin( BUILTIN_BUMPY_ENVIRONMENT2_SSR_SKINNED );
+	}
+
 	void	BindShader_Depth()
 	{
 		BindShader_Builtin( BUILTIN_DEPTH );
@@ -815,6 +851,46 @@ public:
 	void	BindShader_PostProcess()
 	{
 		BindShader_Builtin( BUILTIN_POSTPROCESS );
+	}
+
+	void	BindShader_PostProcess_RetroC64()
+	{
+		BindShader_Builtin( BUILTIN_POSTPROCESS_RETRO_C64 );
+	}
+
+	void	BindShader_PostProcess_RetroCPC()
+	{
+		BindShader_Builtin( BUILTIN_POSTPROCESS_RETRO_CPC );
+	}
+
+	void	BindShader_PostProcess_Retro2Bit()
+	{
+		BindShader_Builtin( BUILTIN_POSTPROCESS_RETRO_2BIT );
+	}
+
+	void	BindShader_PostProcess_RetroGenesis()
+	{
+		BindShader_Builtin( BUILTIN_POSTPROCESS_RETRO_GENESIS );
+	}
+
+	void	BindShader_PostProcess_RetroPSX()
+	{
+		BindShader_Builtin( BUILTIN_POSTPROCESS_RETRO_PSX );
+	}
+
+	void	BindShader_CrtMattias()
+	{
+		BindShader_Builtin( BUILTIN_CRT_MATTIAS );
+	}
+
+	void	BindShader_CrtNewPixie()
+	{
+		BindShader_Builtin( BUILTIN_CRT_NUPIXIE );
+	}
+
+	void	BindShader_CrtEasyMode()
+	{
+		BindShader_Builtin( BUILTIN_CRT_EASYMODE );
 	}
 
 	void	BindShader_Screen()
@@ -932,12 +1008,12 @@ public:
 	// the rpEnableSkinning render parm should only be set for vertex programs that use it
 	bool		ShaderHasOptionalSkinning() const
 	{
-#if defined( USE_NVRHI )
+//#if defined( USE_NVRHI )
 		// FIXME
 		return false;
-#else
-		return renderProgs[current].optionalSkinning;
-#endif
+//#else
+//		return renderProgs[current].optionalSkinning;
+//#endif
 	}
 
 	// unbind the currently bound render program
@@ -954,7 +1030,7 @@ public:
 	static const int	MAX_GLSL_USER_PARMS = 8;
 	const char*	GetGLSLParmName( int rp ) const;
 
-	void		SetUniformValue( const renderParm_t rp, const float* value );
+	void		SetUniformValue( const renderParm_t rp, const float value[4] );
 	void		CommitUniforms( uint64 stateBits );
 	int			FindProgram( const char* name, int vIndex, int fIndex, bindingLayoutType_t bindingType = BINDING_LAYOUT_DEFAULT );
 	void		ZeroUniforms();
@@ -964,7 +1040,7 @@ public:
 
 	ID_INLINE nvrhi::IBuffer*				ConstantBuffer()
 	{
-		return constantBuffer[BindingLayoutType()];
+		return constantBuffer;//[BindingLayoutType()];
 	}
 	ID_INLINE idUniformBuffer&				BindingParamUbo()
 	{
@@ -1070,7 +1146,8 @@ private:
 
 	idStaticList< idStaticList<nvrhi::BindingLayoutHandle, nvrhi::c_MaxBindingLayouts>, NUM_BINDING_LAYOUTS > bindingLayouts;
 
-	idArray<nvrhi::BufferHandle, NUM_BINDING_LAYOUTS>	constantBuffer;
+	//idArray<nvrhi::BufferHandle, NUM_BINDING_LAYOUTS>	constantBuffer;
+	nvrhi::BufferHandle							constantBuffer;
 };
 
 extern idRenderProgManager renderProgManager;

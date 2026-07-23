@@ -54,7 +54,7 @@ public:
 	virtual						~idRenderModelStatic();
 
 	virtual void				InitFromFile( const char* fileName, const idImportOptions* options );
-	virtual bool				LoadBinaryModel( idFile* file, const ID_TIME_T sourceTimeStamp );
+	virtual bool				LoadBinaryModel( idFile* file, const ID_TIME_T sourceTimeStamp, const ID_TIME_T declSourceTimeStamp );
 	virtual void				WriteBinaryModel( idFile* file, ID_TIME_T* _timeStamp = NULL ) const;
 	virtual bool				SupportsBinaryModel()
 	{
@@ -83,6 +83,8 @@ public:
 	virtual void				List() const;
 	virtual int					Memory() const;
 	virtual ID_TIME_T			Timestamp() const;
+	virtual ID_TIME_T			DeclTimestamp() const;	// RB
+	virtual const char*			GetModelDefName() const;
 	virtual int					NumSurfaces() const;
 	virtual int					NumBaseSurfaces() const;
 	virtual const modelSurface_t* Surface( int surfaceNum ) const;
@@ -100,8 +102,6 @@ public:
 	virtual const idJointQuat* 	GetDefaultPose() const;
 	virtual int					NearestJoint( int surfaceNum, int a, int b, int c ) const;
 	virtual idBounds			Bounds( const struct renderEntity_s* ent ) const;
-	virtual void				ReadFromDemoFile( class idDemoFile* f );
-	virtual void				WriteToDemoFile( class idDemoFile* f );
 	virtual float				DepthHack() const;
 
 	virtual bool				ModelHasDrawingSurfaces() const
@@ -122,10 +122,8 @@ public:
 	bool						LoadASE( const char* fileName, ID_TIME_T* sourceTimeStamp );
 	bool						LoadLWO( const char* fileName, ID_TIME_T* sourceTimeStamp );
 	bool						LoadMA( const char* filename, ID_TIME_T* sourceTimeStamp );
-	bool						LoadDAE( const char* fileName, ID_TIME_T* sourceTimeStamp ); // RB
 	bool						LoadOBJ( const char* fileName, ID_TIME_T* sourceTimeStamp ); // RB
 
-	bool						ConvertDAEToModelSurfaces( const ColladaParser* dae ); // RB
 	bool						ConvertOBJToModelSurfaces( const objModel_t* obj ); // RB
 	bool						ConvertASEToModelSurfaces( const struct aseModel_s* ase );
 	bool						ConvertLWOToModelSurfaces( const struct st_lwObject* lwo );
@@ -163,12 +161,17 @@ protected:
 	bool						hasInteractingSurfaces;
 	bool						hasShadowCastingSurfaces;
 	ID_TIME_T					timeStamp;
+	ID_TIME_T					declTimeStamp;			// RB: only != 0 if initialized from modelDef
+	idStr						declModelDefName;		// RB
 
 	static idCVar				r_mergeModelSurfaces;	// combine model surfaces with the same material
 	static idCVar				r_slopVertex;			// merge xyz coordinates this far apart
 	static idCVar				r_slopTexCoord;			// merge texture coordinates this far apart
 	static idCVar				r_slopNormal;			// merge normals that dot less than this
 };
+
+
+#if !defined( DMAP )
 
 /*
 ===============================================================================
@@ -219,7 +222,7 @@ class idRenderModelMD5 : public idRenderModelStatic
 	friend class				idRenderModelGLTF;
 public:
 	void				InitFromFile( const char* fileName, const idImportOptions* options ) override;
-	bool				LoadBinaryModel( idFile* file, const ID_TIME_T sourceTimeStamp ) override;
+	bool				LoadBinaryModel( idFile* file, const ID_TIME_T sourceTimeStamp, const ID_TIME_T declSourceTimeStamp ) override;
 	void				WriteBinaryModel( idFile* file, ID_TIME_T* _timeStamp = NULL ) const override;
 	dynamicModel_t		IsDynamicModel() const override;
 	idBounds			Bounds( const struct renderEntity_s* ent ) const override;
@@ -559,5 +562,7 @@ public:
 		return false;
 	};
 };
+
+#endif // #if !defined( DMAP )
 
 #endif /* !__MODEL_LOCAL_H__ */

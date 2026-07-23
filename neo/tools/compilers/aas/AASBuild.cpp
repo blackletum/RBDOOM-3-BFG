@@ -847,6 +847,10 @@ bool idAASBuild::Build( const idStr& fileName, const idAASSettings* settings )
 		return true;
 	}
 
+	name.SetFileExtension( aasSettings->fileExtension );
+	common->DmapPacifierFilename( name, "Compiling AAS" );
+	name.SetFileExtension( "map" );
+
 	// load map file brushes
 	brushList = AddBrushesForMapFile( mapFile, brushList );
 
@@ -968,6 +972,7 @@ bool idAASBuild::Build( const idStr& fileName, const idAASSettings* settings )
 	delete mapFile;
 
 	common->Printf( "%6d seconds to create AAS\n", ( Sys_Milliseconds() - startTime ) / 1000 );
+	common->DmapPacifierInfo( "%6d seconds to create AAS\n", ( Sys_Milliseconds() - startTime ) / 1000 );
 
 	return true;
 }
@@ -1069,6 +1074,18 @@ int ParseOptions( const idCmdArgs& args, idAASSettings& settings )
 	return args.Argc() - 1;
 }
 
+// RB begin
+static const idDict* FindEntityDefDict( const char* name, bool makeDefault )
+{
+#if defined( DMAP )
+	const idDeclEntityDef* decl = static_cast<const idDeclEntityDef*>( declManager->FindType( DECL_ENTITYDEF, name, makeDefault ) );
+	return decl ? &decl->dict : NULL;
+#else
+	return gameEdit->FindEntityDefDict( name, makeDefault );
+#endif
+}
+// RB end
+
 /*
 ============
 RunAAS_f
@@ -1096,7 +1113,7 @@ void RunAAS_f( const idCmdArgs& args )
 	common->SetRefreshOnPrint( true );
 
 	// get the aas settings definitions
-	const idDict* dict = gameEdit->FindEntityDefDict( "aas_types", false );
+	const idDict* dict = FindEntityDefDict( "aas_types", false );
 	if( !dict )
 	{
 		common->Error( "Unable to find entityDef for 'aas_types'" );
@@ -1105,7 +1122,7 @@ void RunAAS_f( const idCmdArgs& args )
 	const idKeyValue* kv = dict->MatchPrefix( "type" );
 	while( kv != NULL )
 	{
-		const idDict* settingsDict = gameEdit->FindEntityDefDict( kv->GetValue(), false );
+		const idDict* settingsDict = FindEntityDefDict( kv->GetValue(), false );
 		if( !settingsDict )
 		{
 			common->Warning( "Unable to find '%s' in def/aas.def", kv->GetValue().c_str() );
@@ -1156,7 +1173,7 @@ void RunAASDir_f( const idCmdArgs& args )
 	common->SetRefreshOnPrint( true );
 
 	// get the aas settings definitions
-	const idDict* dict = gameEdit->FindEntityDefDict( "aas_types", false );
+	const idDict* dict = FindEntityDefDict( "aas_types", false );
 	if( !dict )
 	{
 		common->Error( "Unable to find entityDef for 'aas_types'" );
@@ -1176,7 +1193,7 @@ void RunAASDir_f( const idCmdArgs& args )
 		const idKeyValue* kv = dict->MatchPrefix( "type" );
 		while( kv != NULL )
 		{
-			const idDict* settingsDict = gameEdit->FindEntityDefDict( kv->GetValue(), false );
+			const idDict* settingsDict = FindEntityDefDict( kv->GetValue(), false );
 			if( !settingsDict )
 			{
 				common->Warning( "Unable to find '%s' in def/aas.def", kv->GetValue().c_str() );
@@ -1223,7 +1240,7 @@ void RunReach_f( const idCmdArgs& args )
 	common->SetRefreshOnPrint( true );
 
 	// get the aas settings definitions
-	const idDict* dict = gameEdit->FindEntityDefDict( "aas_types", false );
+	const idDict* dict = FindEntityDefDict( "aas_types", false );
 	if( !dict )
 	{
 		common->Error( "Unable to find entityDef for 'aas_types'" );
@@ -1232,7 +1249,7 @@ void RunReach_f( const idCmdArgs& args )
 	const idKeyValue* kv = dict->MatchPrefix( "type" );
 	while( kv != NULL )
 	{
-		const idDict* settingsDict = gameEdit->FindEntityDefDict( kv->GetValue(), false );
+		const idDict* settingsDict = FindEntityDefDict( kv->GetValue(), false );
 		if( !settingsDict )
 		{
 			common->Warning( "Unable to find '%s' in def/aas.def", kv->GetValue().c_str() );

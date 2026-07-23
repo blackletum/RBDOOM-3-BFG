@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2014-2020 Robert Beckebans
+Copyright (C) 2014-2023 Robert Beckebans
 Copyright (C) 2014-2016 Kot in Action Creative Artel
 Copyright (C) 2022 Stephen Pridham
 
@@ -35,8 +35,6 @@ If you have questions concerning this license or the applicable additional terms
 
 // RB: define this to use the id Tech 4.5 UI interface for ImGui instead of OpenGL or Vulkan
 // this allows to have the com_showFPS stats in screenshots
-
-#define IMGUI_BFGUI 1
 
 /*
 ===============================================================================
@@ -166,11 +164,12 @@ typedef enum
 	TG_EXPLICIT,
 	TG_DIFFUSE_CUBE,
 	TG_REFLECT_CUBE,
+	TG_REFLECT_CUBE2,	// RB interpolates 3 octahedrons like for ambient lighting
 	TG_SKYBOX_CUBE,
 	TG_WOBBLESKY_CUBE,
 	TG_SCREEN,			// screen aligned, for mirrorRenders and screen space temporaries
 	TG_SCREEN2,
-	TG_GLASSWARP
+	TG_GLASSWARP,
 } texgen_t;
 
 typedef struct
@@ -363,9 +362,8 @@ typedef enum
 	MF_LOD3						= BIT( 9 ),	 // motorsep 11-24-2014; material flag for LOD3 iteration
 	MF_LOD4						= BIT( 10 ), // motorsep 11-24-2014; material flag for LOD4 iteration
 	MF_LOD_PERSISTENT			= BIT( 11 ), // motorsep 11-24-2014; material flag for persistent LOD iteration
-	MF_GUITARGET				= BIT( 12 ), // Admer: this GUI surface is used to compute a GUI render map, but a GUI should NOT be drawn on it
-	MF_AUTOGEN_TEMPLATE			= BIT( 13 ), // Admer: this material is a template for auto-generated templates
-	MF_ORIGIN					= BIT( 14 ), // Admer: for origin brushes
+	MF_ORIGIN					= BIT( 12 ), // Admer: for origin brushes
+	MF_UNLIT					= BIT( 13 ), // RB: receive no lighting
 } materialFlags_t;
 
 // contents flags, NOTE: make sure to keep the defines in doom_defs.script up to date with these!
@@ -443,8 +441,8 @@ typedef enum
 	SURF_NOSTEPS				= BIT( 9 ),	// no footstep sounds
 	SURF_DISCRETE				= BIT( 10 ),	// not clipped or merged by utilities
 	SURF_NOFRAGMENT				= BIT( 11 ),	// dmap won't cut surface at each bsp boundary
-	SURF_NULLNORMAL				= BIT( 12 )	// renderbump will draw this surface as 0x80 0x80 0x80, which
-								  // won't collect light from any angle
+	SURF_NULLNORMAL				= BIT( 12 ),	// renderbump will draw this surface as 0x80 0x80 0x80, which won't collect light from any angle
+	SURF_OCCLUSION				= BIT( 13 ),	// RB: occluder surface
 } surfaceFlags_t;
 
 
@@ -597,7 +595,7 @@ public:
 	// stages, and don't interact with lights at all
 	bool				ReceivesLighting() const
 	{
-		return numAmbientStages != numStages;
+		return ( numAmbientStages != numStages ) && ( materialFlags & MF_UNLIT ) == 0;
 	}
 
 	// returns true if the material should generate interactions on sides facing away
@@ -684,6 +682,12 @@ public:
 	bool				NoFragment() const
 	{
 		return ( surfaceFlags & SURF_NOFRAGMENT ) != 0;
+	}
+
+	// RB: occluder surfaces are invisible and only get rendered to the masked occlusion depth buffer
+	bool				IsOccluder() const
+	{
+		return ( surfaceFlags & SURF_OCCLUSION ) != 0;
 	}
 
 	//------------------------------------------------------------------
@@ -951,6 +955,8 @@ public:
 		return distance >= m1 && ( distance < m2 || ( materialFlags & ( MF_LOD_PERSISTENT ) ) );
 	}
 
+	// RB: for exporting materials to Blender
+	void				ExportJSON( idFile* file, bool lastEntry ) const;
 
 private:
 	// parse the entire material

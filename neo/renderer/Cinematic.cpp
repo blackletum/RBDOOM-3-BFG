@@ -38,11 +38,14 @@ If you have questions concerning this license or the applicable additional terms
 
 
 // SRS - Add cvar to control whether cinematic audio is played: default is ON
-idCVar s_playCinematicAudio( "s_playCinematicAudio", "1", CVAR_BOOL, "Play audio if available in cinematic video files" );
+idCVar s_playCinematicAudio( "s_playCinematicAudio", "1", CVAR_BOOL | CVAR_NEW, "Play audio if available in cinematic video files" );
 
-//extern "C" {
-#include <jpeglib.h>
-//}
+// DG: get rid of libjpeg; as far as I can tell no roqs that actually use it exist
+//#define ID_USE_LIBJPEG 1
+#ifdef ID_USE_LIBJPEG
+	#include <jpeglib.h>
+	#include <jerror.h>
+#endif
 
 #include "RenderCommon.h"
 
@@ -71,6 +74,7 @@ extern "C"
 #include <libswresample/swresample.h>
 #include <libavutil/imgutils.h>
 }
+#include <queue>
 #define NUM_LAG_FRAMES 15	// SRS - Lag audio by 15 frames (~1/2 sec at 30 fps) for ffmpeg bik decoder AV sync
 #endif
 
@@ -130,9 +134,8 @@ private:
 	cinData_t				ImageForTimeFFMPEG( int milliseconds, nvrhi::ICommandList* commandList );
 	bool					InitFromFFMPEGFile( const char* qpath, bool looping, nvrhi::ICommandList* commandList );
 	void					FFMPEGReset();
-	uint8_t*				lagBuffer[NUM_LAG_FRAMES] = {};
-	int						lagBufSize[NUM_LAG_FRAMES] = {};
-	int						lagIndex;
+	std::queue<uint8_t*>	lagBuffer;
+	std::queue<int>			lagBufSize;
 	bool					skipLag;
 #endif
 #ifdef USE_BINKDEC
@@ -254,6 +257,7 @@ static unsigned short* 	vq2 = NULL;
 static unsigned short* 	vq4 = NULL;
 static unsigned short* 	vq8 = NULL;
 
+extern idCVar s_noSound;
 
 
 //===========================================
@@ -469,7 +473,6 @@ idCinematicLocal::idCinematicLocal()
 	img_convert_ctx = NULL;
 	hasFrame = false;
 	framePos = -1;
-	lagIndex = 0;
 	skipLag = false;
 #endif
 
@@ -842,14 +845,11 @@ void idCinematicLocal::FFMPEGReset()
 	{
 		cinematicAudio->ResetAudio();
 
-		lagIndex = 0;
-		for( int i = 0; i < NUM_LAG_FRAMES; i++ )
+		while( !lagBuffer.empty() )
 		{
-			lagBufSize[ i ] = 0;
-			if( lagBuffer[ i ] )
-			{
-				av_freep( &lagBuffer[ i ] );
-			}
+			av_freep( &lagBuffer.front() );
+			lagBuffer.pop();
+			lagBufSize.pop();
 		}
 	}
 
@@ -910,7 +910,7 @@ bool idCinematicLocal::InitFromBinkDecFile( const char* qpath, bool amilooping, 
 		}
 		else
 		{
-			common->Warning( "idCinematic: Cannot open BinkDec video file: '%s', %d\n", qpath, looping );
+			common->Warning( "idCinematic: Cannot open Bink video file: '%s', %d\n", qpath, looping );
 			return false;
 		}
 	}
@@ -918,7 +918,7 @@ bool idCinematicLocal::InitFromBinkDecFile( const char* qpath, bool amilooping, 
 	binkHandle = Bink_Open( fullpath );
 	if( !binkHandle.isValid )
 	{
-		common->Warning( "idCinematic: Cannot open BinkDec video file: '%s', %d\n", qpath, looping );
+		common->Warning( "idCinematic: Cannot open Bink video file: '%s', %d\n", qpath, looping );
 		return false;
 	}
 
@@ -948,7 +948,7 @@ bool idCinematicLocal::InitFromBinkDecFile( const char* qpath, bool amilooping, 
 	numFrames = Bink_GetNumFrames( binkHandle );
 	float durationSec = numFrames / frameRate;      // SRS - fixed Bink durationSec calculation
 	animationLength = durationSec * 1000;           // SRS - animationLength is in milliseconds
-	common->Printf( "Loaded BinkDec file: '%s', looping=%d, %dx%d, %3.2f FPS, %4.1f sec\n", qpath, looping, CIN_WIDTH, CIN_HEIGHT, frameRate, durationSec );
+	common->Printf( "Loaded Bink file: '%s', looping=%d, %dx%d, %3.2f FPS, %4.1f sec\n", qpath, looping, CIN_WIDTH, CIN_HEIGHT, frameRate, durationSec );
 
 	memset( yuvBuffer, 0, sizeof( yuvBuffer ) );
 
@@ -1174,14 +1174,11 @@ void idCinematicLocal::Close()
 				swr_free( &swr_ctx );
 			}
 
-			lagIndex = 0;
-			for( int i = 0; i < NUM_LAG_FRAMES; i++ )
+			while( !lagBuffer.empty() )
 			{
-				lagBufSize[ i ] = 0;
-				if( lagBuffer[ i ] )
-				{
-					av_freep( &lagBuffer[ i ] );
-				}
+				av_freep( &lagBuffer.front() );
+				lagBuffer.pop();
+				lagBufSize.pop();
 			}
 		}
 
@@ -1378,6 +1375,7 @@ cinData_t idCinematicLocal::ImageForTimeFFMPEG( int thisTime, nvrhi::ICommandLis
 	char		error[64];
 	uint8_t*	audioBuffer = NULL;
 	int			num_bytes = 0;
+	bool		syncLost = false;
 
 	memset( &cinData, 0, sizeof( cinData ) );
 	if( !fmt_ctx )
@@ -1491,8 +1489,8 @@ cinData_t idCinematicLocal::ImageForTimeFFMPEG( int thisTime, nvrhi::ICommandLis
 							common->Warning( "idCinematic: Failed to receive audio frame from decoding with error: %s\n", error );
 						}
 					}
-					// SRS - For the final (desired) frame only: allocate audio buffers, convert to packed format, and play the synced audio frames
-					else if( framePos + 1 == desiredFrame )
+					// SRS - Allocate audio buffer, convert to packed format, save in queue, and play synced audio for desired frame
+					else
 					{
 						// SRS - Since destination sample format is packed (non-planar), returned bufflinesize equals num_bytes
 #if	LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(59,37,100)
@@ -1521,27 +1519,55 @@ cinData_t idCinematicLocal::ImageForTimeFFMPEG( int thisTime, nvrhi::ICommandLis
 								memcpy( audioBuffer, frame3->extended_data[0], num_bytes );
 							}
 						}
-						// SRS - If we have cinematic audio data, play a lagged frame (for bik video sync) and save the current frame
+
+						// SRS - If we have cinematic audio data, save the current frame onto the back of the queue
 						if( num_bytes > 0 )
 						{
-							// SRS - If we have a lagged cinematic audio frame, then play it now
-							if( lagBufSize[ lagIndex ] > 0 )
+							// SRS - If queue is at max size we have lost a/v sync: drop frame and set syncLost flag
+							if( lagBuffer.size() == ( skipLag ? 1 : NUM_LAG_FRAMES ) )
 							{
-								// SRS - Note that PlayAudio() is responsible for releasing any audio buffers sent to it
-								cinematicAudio->PlayAudio( lagBuffer[ lagIndex ], lagBufSize[ lagIndex ] );
+								av_freep( &lagBuffer.front() );
+								lagBuffer.pop();
+								lagBufSize.pop();
+
+								syncLost = true;
 							}
 
-							// SRS - Save the current (new) audio buffer and its size to play in the future
-							lagBuffer[ lagIndex ] = audioBuffer;
-							lagBufSize[ lagIndex ] = num_bytes;
-
-							// SRS - If skipLag is true (e.g. RoQ, mp4, webm), reduce lag to 1 frame since AV playback is already synced
-							lagIndex = ( lagIndex + 1 ) % ( skipLag ? 1 : NUM_LAG_FRAMES );
+							// SRS - Save the current (new) audio buffer and its size to play during the desired frame
+							lagBuffer.push( audioBuffer );
+							lagBufSize.push( num_bytes );
 						}
 						// SRS - Not sure if an audioBuffer can ever be allocated on failure, but check and free just in case
 						else if( audioBuffer )
 						{
 							av_freep( &audioBuffer );
+						}
+
+						// SRS - If we have any synced audio frames available for the desired frame, play now and drain queue
+						if( framePos + 1 == desiredFrame )
+						{
+							if( syncLost )
+							{
+								// SRS - If we have lost sync, reset / resync audio stream before starting to play again
+								cinematicAudio->ResetAudio();
+								syncLost = false;
+							}
+
+							while( !lagBuffer.empty() )
+							{
+								// SRS - Note that PlayAudio() is responsible for releasing any audio buffers sent to it
+								if( !s_noSound.GetBool() )
+								{
+									cinematicAudio->PlayAudio( lagBuffer.front(), lagBufSize.front() );
+								}
+								else
+								{
+									av_freep( &lagBuffer.front() );
+								}
+
+								lagBuffer.pop();
+								lagBufSize.pop();
+							}
 						}
 						//common->Printf( "idCinematic: video pts = %7.3f, audio pts = %7.3f, samples = %4d, num_bytes = %5d\n", static_cast<double>( frame->pts ) * av_q2d( dec_ctx->pkt_timebase ), static_cast<double>( frame3->pts ) * av_q2d( dec_ctx2->pkt_timebase ), frame3->nb_samples, num_bytes );
 					}
@@ -1712,7 +1738,7 @@ cinData_t idCinematicLocal::ImageForTimeBinkDec( int thisTime, nvrhi::ICommandLi
 		num_bytes = Bink_GetAudioData( binkHandle, trackIndex, audioBuffer );
 
 		// SRS - If we have cinematic audio data, start playing it now
-		if( num_bytes > 0 )
+		if( num_bytes > 0 && !s_noSound.GetBool() )
 		{
 			// SRS - Note that PlayAudio() is responsible for releasing any audio buffers sent to it
 			cinematicAudio->PlayAudio( ( uint8_t* )audioBuffer, num_bytes );
@@ -2778,216 +2804,20 @@ void idCinematicLocal::RoQReset()
 	status = FMV_LOOPED;
 }
 
-
-typedef struct
-{
-	struct jpeg_source_mgr pub;	/* public fields */
-
-	byte*   infile;		/* source stream */
-	JOCTET* buffer;		/* start of buffer */
-	boolean start_of_file;	/* have we gotten any data yet? */
-	int	memsize;
-} my_source_mgr;
-
-typedef my_source_mgr* my_src_ptr;
-
-#define INPUT_BUF_SIZE  32768	/* choose an efficiently fread'able size */
-
-/* jpeg error handling */
-struct jpeg_error_mgr jerr;
-
-/*
- * Fill the input buffer --- called whenever buffer is emptied.
- *
- * In typical applications, this should read fresh data into the buffer
- * (ignoring the current state of next_input_byte & bytes_in_buffer),
- * reset the pointer & count to the start of the buffer, and return TRUE
- * indicating that the buffer has been reloaded.  It is not necessary to
- * fill the buffer entirely, only to obtain at least one more byte.
- *
- * There is no such thing as an EOF return.  If the end of the file has been
- * reached, the routine has a choice of ERREXIT() or inserting fake data into
- * the buffer.  In most cases, generating a warning message and inserting a
- * fake EOI marker is the best course of action --- this will allow the
- * decompressor to output however much of the image is there.  However,
- * the resulting error message is misleading if the real problem is an empty
- * input file, so we handle that case specially.
- *
- * In applications that need to be able to suspend compression due to input
- * not being available yet, a FALSE return indicates that no more data can be
- * obtained right now, but more may be forthcoming later.  In this situation,
- * the decompressor will return to its caller (with an indication of the
- * number of scanlines it has read, if any).  The application should resume
- * decompression after it has loaded more data into the input buffer.  Note
- * that there are substantial restrictions on the use of suspension --- see
- * the documentation.
- *
- * When suspending, the decompressor will back up to a convenient restart point
- * (typically the start of the current MCU). next_input_byte & bytes_in_buffer
- * indicate where the restart point will be if the current call returns FALSE.
- * Data beyond this point must be rescanned after resumption, so move it to
- * the front of the buffer rather than discarding it.
- */
-
-#ifdef USE_NEWER_JPEG
-	METHODDEF( boolean )
-#else
-	METHODDEF boolean
+#ifdef ID_USE_LIBJPEG
+	/* jpeg error handling */
+	struct jpeg_error_mgr jerr;
 #endif
-fill_input_buffer( j_decompress_ptr cinfo )
-{
-	my_src_ptr src = ( my_src_ptr ) cinfo->src;
-	int nbytes;
-
-	nbytes = INPUT_BUF_SIZE;
-	if( nbytes > src->memsize )
-	{
-		nbytes = src->memsize;
-	}
-	if( nbytes == 0 )
-	{
-		/* Insert a fake EOI marker */
-		src->buffer[0] = ( JOCTET ) 0xFF;
-		src->buffer[1] = ( JOCTET ) JPEG_EOI;
-		nbytes = 2;
-	}
-	else
-	{
-		memcpy( src->buffer, src->infile, INPUT_BUF_SIZE );
-		src->infile = src->infile + nbytes;
-		src->memsize = src->memsize - INPUT_BUF_SIZE;
-	}
-	src->pub.next_input_byte = src->buffer;
-	src->pub.bytes_in_buffer = nbytes;
-	src->start_of_file = FALSE;
-
-	return TRUE;
-}
-/*
- * Initialize source --- called by jpeg_read_header
- * before any data is actually read.
- */
-
-#ifdef USE_NEWER_JPEG
-	METHODDEF( void )
-#else
-	METHODDEF void
-#endif
-init_source( j_decompress_ptr cinfo )
-{
-	my_src_ptr src = ( my_src_ptr ) cinfo->src;
-
-	/* We reset the empty-input-file flag for each image,
-	 * but we don't clear the input buffer.
-	 * This is correct behavior for reading a series of images from one source.
-	 */
-	src->start_of_file = TRUE;
-}
-
-/*
- * Skip data --- used to skip over a potentially large amount of
- * uninteresting data (such as an APPn marker).
- *
- * Writers of suspendable-input applications must note that skip_input_data
- * is not granted the right to give a suspension return.  If the skip extends
- * beyond the data currently in the buffer, the buffer can be marked empty so
- * that the next read will cause a fill_input_buffer call that can suspend.
- * Arranging for additional bytes to be discarded before reloading the input
- * buffer is the application writer's problem.
- */
-
-#ifdef USE_NEWER_JPEG
-	METHODDEF( void )
-#else
-	METHODDEF void
-#endif
-skip_input_data( j_decompress_ptr cinfo, long num_bytes )
-{
-	my_src_ptr src = ( my_src_ptr ) cinfo->src;
-
-	/* Just a dumb implementation for now.  Could use fseek() except
-	 * it doesn't work on pipes.  Not clear that being smart is worth
-	 * any trouble anyway --- large skips are infrequent.
-	 */
-	if( num_bytes > 0 )
-	{
-		src->infile = src->infile + num_bytes;
-		src->pub.next_input_byte += ( size_t ) num_bytes;
-		src->pub.bytes_in_buffer -= ( size_t ) num_bytes;
-	}
-}
-
-
-/*
- * An additional method that can be provided by data source modules is the
- * resync_to_restart method for error recovery in the presence of RST markers.
- * For the moment, this source module just uses the default resync method
- * provided by the JPEG library.  That method assumes that no backtracking
- * is possible.
- */
-
-
-/*
- * Terminate source --- called by jpeg_finish_decompress
- * after all data has been read.  Often a no-op.
- *
- * NB: *not* called by jpeg_abort or jpeg_destroy; surrounding
- * application must deal with any cleanup that should happen even
- * for error exit.
- */
-
-#ifdef USE_NEWER_JPEG
-	METHODDEF( void )
-#else
-	METHODDEF void
-#endif
-term_source( j_decompress_ptr cinfo )
-{
-	cinfo = cinfo;
-	/* no work necessary here */
-}
-
-#ifdef USE_NEWER_JPEG
-	GLOBAL( void )
-#else
-	GLOBAL void
-#endif
-jpeg_memory_src( j_decompress_ptr cinfo, byte* infile, int size )
-{
-	my_src_ptr src;
-
-	/* The source object and input buffer are made permanent so that a series
-	 * of JPEG images can be read from the same file by calling jpeg_stdio_src
-	 * only before the first one.  (If we discarded the buffer at the end of
-	 * one image, we'd likely lose the start of the next one.)
-	 * This makes it unsafe to use this manager and a different source
-	 * manager serially with the same JPEG object.  Caveat programmer.
-	 */
-	if( cinfo->src == NULL )  	/* first time for this JPEG object? */
-	{
-		cinfo->src = ( struct jpeg_source_mgr* )
-					 ( *cinfo->mem->alloc_small )( ( j_common_ptr ) cinfo, JPOOL_PERMANENT,
-							 sizeof( my_source_mgr ) );
-		src = ( my_src_ptr ) cinfo->src;
-		src->buffer = ( JOCTET* )
-					  ( *cinfo->mem->alloc_small )( ( j_common_ptr ) cinfo, JPOOL_PERMANENT,
-							  INPUT_BUF_SIZE * sizeof( JOCTET ) );
-	}
-
-	src = ( my_src_ptr ) cinfo->src;
-	src->pub.init_source = init_source;
-	src->pub.fill_input_buffer = fill_input_buffer;
-	src->pub.skip_input_data = skip_input_data;
-	src->pub.resync_to_restart = jpeg_resync_to_restart; /* use default method */
-	src->pub.term_source = term_source;
-	src->infile = infile;
-	src->memsize = size;
-	src->pub.bytes_in_buffer = 0; /* forces fill_input_buffer on first read */
-	src->pub.next_input_byte = NULL; /* until buffer loaded */
-}
 
 int JPEGBlit( byte* wStatus, byte* data, int datasize )
 {
+#ifndef ID_USE_LIBJPEG
+	// I don't think this code is actually used, because
+	// * the jpeg encoder parts in the roq encoder are disabled with #if 0
+	// * ffmpeg doesn't support ROQ_QUAD_JPEG and can decode all doom3 roqs anyway
+	common->Warning( "Contrary to Daniel's assumption, JPEGBlit() is actually called! Please report that as a dhewm3 bug!\n" );
+
+#else
 	/* This struct contains the JPEG decompression parameters and pointers to
 	 * working space (which is allocated as needed by the JPEG library).
 	 */
@@ -3010,11 +2840,11 @@ int JPEGBlit( byte* wStatus, byte* data, int datasize )
 
 	/* Step 2: specify data source (eg, a file) */
 
-	jpeg_memory_src( &cinfo, data, datasize );
+	jpeg_mem_src( &cinfo, data, datasize );
 
 	/* Step 3: read file parameters with jpeg_read_header() */
 
-	jpeg_read_header( &cinfo, TRUE );
+	( void ) jpeg_read_header( &cinfo, TRUE );
 	/* We can ignore the return value from jpeg_read_header since
 	 *   (a) suspension is not possible with the stdio data source, and
 	 *   (b) we passed TRUE to reject a tables-only JPEG file as an error.
@@ -3035,7 +2865,7 @@ int JPEGBlit( byte* wStatus, byte* data, int datasize )
 	cinfo.do_fancy_upsampling = FALSE;
 //	cinfo.out_color_space = JCS_GRAYSCALE;
 
-	jpeg_start_decompress( &cinfo );
+	( void ) jpeg_start_decompress( &cinfo );
 	/* We can ignore the return value since suspension is not possible
 	 * with the stdio data source.
 	 */
@@ -3102,7 +2932,7 @@ int JPEGBlit( byte* wStatus, byte* data, int datasize )
 	/* At this point you may want to check to see whether any corrupt-data
 	 * warnings occurred (test whether jerr.pub.num_warnings is nonzero).
 	 */
-
+#endif
 	/* And we're done! */
 	return 1;
 }

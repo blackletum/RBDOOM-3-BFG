@@ -249,7 +249,7 @@ public:
 	idBlockAlloc<areaReference_t, 1024> areaReferenceAllocator;
 	idBlockAlloc<idInteraction, 256>	interactionAllocator;
 
-#ifdef ID_PC
+#if 1 //def ID_PC
 	static const int MAX_DECAL_SURFACES = 32;
 #else
 	static const int MAX_DECAL_SURFACES = 16;
@@ -272,7 +272,6 @@ public:
 	// RenderWorld_load.cpp
 
 	idRenderModel* 			ParseModel( idLexer* src, const char* mapName, ID_TIME_T mapTimeStamp, idFile* fileOut );
-	idRenderModel* 			ParseShadowModel( idLexer* src, idFile* fileOut );
 	void					SetupAreaRefs();
 	void					ParseInterAreaPortals( idLexer* src, idFile* fileOut );
 	void					ParseNodes( idLexer* src, idFile* fileOut );
@@ -286,7 +285,6 @@ public:
 	void					ReadBinaryAreaPortals( idFile* file );
 	void					ReadBinaryNodes( idFile* file );
 	idRenderModel* 			ReadBinaryModel( idFile* file );
-	idRenderModel* 			ReadBinaryShadowModel( idFile* file );
 
 	//--------------------------
 	// RenderWorld_portals.cpp
@@ -338,30 +336,6 @@ public:
 	{
 		return areaScreenRect[areaNum];
 	}
-
-	//--------------------------
-	// RenderWorld_demo.cpp
-
-	void					StartWritingDemo( idDemoFile* demo );
-	void					StopWritingDemo();
-	bool					ProcessDemoCommand( idDemoFile* readDemo, renderView_t* demoRenderView, int* demoTimeOffset );
-
-	void					WriteLoadMap();
-	void					WriteRenderView( const renderView_t* renderView );
-	void					WriteVisibleDefs( const viewDef_t* viewDef );
-	void					WriteFreeDecal( idDemoFile* f, qhandle_t handle );
-	void					WriteFreeOverlay( idDemoFile* f, qhandle_t handle );
-	void					WriteFreeLight( qhandle_t handle );
-	void					WriteFreeEntity( qhandle_t handle );
-	void					WriteFreeEnvprobe( qhandle_t handle ); // RB
-	void					WriteRenderDecal( idDemoFile* f, qhandle_t handle );
-	void					WriteRenderOverlay( idDemoFile* f, qhandle_t handle );
-	void					WriteRenderLight( idDemoFile* f, qhandle_t handle, const renderLight_t* light );
-	void					WriteRenderEntity( idDemoFile* f, idRenderEntityLocal* entity );
-	void					WriteRenderEnvprobe( qhandle_t handle, const renderEnvironmentProbe_t* probe ); // RB
-	void					ReadRenderEntity();
-	void					ReadRenderLight();
-	void					ReadRenderEnvprobe(); // RB
 
 
 	//--------------------------

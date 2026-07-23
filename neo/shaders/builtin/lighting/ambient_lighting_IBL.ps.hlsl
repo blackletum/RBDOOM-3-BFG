@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013-2021 Robert Beckebans
+Copyright (C) 2013-2025 Robert Beckebans
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -48,82 +48,27 @@ SamplerState s_Material			: register( s0 VK_DESCRIPTOR_SET( 3 ) ); // (Wrap) Ani
 SamplerState s_LinearClamp		: register( s1 VK_DESCRIPTOR_SET( 3 ) ); // (Clamp) Linear sampler: brdf lut sampler & ssao sampler
 //SamplerState s_Light			: register( s2 VK_DESCRIPTOR_SET( 3 )); // (Clamp) Anisotropic sampler: irradiance, radiance 1, 2 and 3.
 
-struct PS_IN 
+struct PS_IN
 {
-	half4 position	: SV_Position;
-	half4 texcoord0	: TEXCOORD0_centroid;
-	half4 texcoord1	: TEXCOORD1_centroid;
-	half4 texcoord2	: TEXCOORD2_centroid;
-	half4 texcoord3	: TEXCOORD3_centroid;
-	half4 texcoord4	: TEXCOORD4_centroid;
-	half4 texcoord5	: TEXCOORD5_centroid;
-	half4 texcoord6	: TEXCOORD6_centroid;
-	half4 texcoord7	: TEXCOORD7_centroid;
-	half4 color		: COLOR0;
+	float4 position		: SV_Position;
+	float4 texcoord0	: TEXCOORD0_centroid;
+	float4 texcoord1	: TEXCOORD1_centroid;
+	float4 texcoord2	: TEXCOORD2_centroid;
+	float4 texcoord3	: TEXCOORD3_centroid;
+	float4 texcoord4	: TEXCOORD4_centroid;
+	float4 texcoord5	: TEXCOORD5_centroid;
+	float4 texcoord6	: TEXCOORD6_centroid;
+	float4 texcoord7	: TEXCOORD7_centroid;
+	float4 color		: COLOR0;
 };
 
 struct PS_OUT
 {
-	half4 color : SV_Target0;
+	float4 color : SV_Target0;
 };
 // *INDENT-ON*
 
 
-// RB: TODO OPTIMIZE
-// this is a straight port of idBounds::RayIntersection
-bool AABBRayIntersection( float3 b[2], float3 start, float3 dir, out float scale )
-{
-	int i, ax0, ax1, ax2, side, inside;
-	float f;
-	float3 hit;
-
-	ax0 = -1;
-	inside = 0;
-	for( i = 0; i < 3; i++ )
-	{
-		if( start[i] < b[0][i] )
-		{
-			side = 0;
-		}
-		else if( start[i] > b[1][i] )
-		{
-			side = 1;
-		}
-		else
-		{
-			inside++;
-			continue;
-		}
-		if( dir[i] == 0.0f )
-		{
-			continue;
-		}
-
-		f = ( start[i] - b[side][i] );
-
-		if( ax0 < 0 || abs( f ) > abs( scale * dir[i] ) )
-		{
-			scale = - ( f / dir[i] );
-			ax0 = i;
-		}
-	}
-
-	if( ax0 < 0 )
-	{
-		scale = 0.0f;
-
-		// return true if the start point is inside the bounds
-		return ( inside == 3 );
-	}
-
-	ax1 = ( ax0 + 1 ) % 3;
-	ax2 = ( ax0 + 2 ) % 3;
-	hit[ax1] = start[ax1] + scale * dir[ax1];
-	hit[ax2] = start[ax2] + scale * dir[ax2];
-
-	return ( hit[ax1] >= b[0][ax1] && hit[ax1] <= b[1][ax1] &&
-			 hit[ax2] >= b[0][ax2] && hit[ax2] <= b[1][ax2] );
-}
 
 
 float2 OctTexCoord( float3 worldDir )
@@ -147,14 +92,26 @@ float2 OctTexCoord( float3 worldDir )
 
 void main( PS_IN fragment, out PS_OUT result )
 {
-	half4 bumpMap =		t_Normal.Sample( s_Material, fragment.texcoord0.xy );
-	half4 YCoCG =		t_BaseColor.Sample( s_Material, fragment.texcoord1.xy );
-	half4 specMapSRGB =	t_Specular.Sample( s_Material, fragment.texcoord2.xy );
-	half4 specMap =		sRGBAToLinearRGBA( specMapSRGB );
+	float2 baseUV = fragment.texcoord1.xy;
+	float2 bumpUV = fragment.texcoord0.xy;
+	float2 specUV = fragment.texcoord2.xy;
 
-	half3 diffuseMap = sRGBToLinearRGB( ConvertYCoCgToRGB( YCoCG ) );
+	// PSX affine texture mapping
+	if( rpPSXDistortions.z > 0.0 )
+	{
+		baseUV /= fragment.texcoord0.z;
+		bumpUV /= fragment.texcoord0.z;
+		specUV /= fragment.texcoord0.z;
+	}
 
-	half3 localNormal;
+	float4 bumpMap =		t_Normal.Sample( s_Material, bumpUV );
+	float4 YCoCG =		t_BaseColor.Sample( s_Material, baseUV );
+	float4 specMapSRGB =	t_Specular.Sample( s_Material, specUV );
+	float4 specMap =		sRGBAToLinearRGBA( specMapSRGB );
+
+	float3 diffuseMap = sRGBToLinearRGB( ConvertYCoCgToRGB( YCoCG ) );
+
+	float3 localNormal;
 #if defined(USE_NORMAL_FMT_RGB8)
 	localNormal.xy = bumpMap.rg - 0.5;
 #else
@@ -204,42 +161,54 @@ void main( PS_IN fragment, out PS_OUT result )
 	}
 #endif
 
-	half vDotN = saturate( dot3( globalView, globalNormal ) );
+	float vDotN = saturate( dot3( globalView, globalNormal ) );
 
 #if USE_PBR
-	const half metallic = specMapSRGB.g;
-	const half roughness = specMapSRGB.r;
-	const half glossiness = 1.0 - roughness;
+	const float metallic = specMapSRGB.g;
+	const float roughness = specMapSRGB.r;
+	const float glossiness = 1.0 - roughness;
+	float ao = specMapSRGB.b;
 
 	// the vast majority of real-world materials (anything not metal or gems) have F(0)
 	// values in a very narrow range (~0.02 - 0.08)
 
 	// approximate non-metals with linear RGB 0.04 which is 0.08 * 0.5 (default in UE4)
-	const half3 dielectricColor = _half3( 0.04 );
+	const float3 dielectricColor = _float3( 0.04 );
 
 	// derive diffuse and specular from albedo(m) base color
-	const half3 baseColor = diffuseMap;
+	const float3 baseColor = diffuseMap;
 
-	half3 diffuseColor = baseColor * ( 1.0 - metallic );
-	half3 specularColor = lerp( dielectricColor, baseColor, metallic );
+	float3 diffuseColor = baseColor * ( 1.0 - metallic );
+	float3 specularColor = lerp( dielectricColor, baseColor, metallic );
 
 #if defined( DEBUG_PBR )
-	diffuseColor = half3( 0.0, 0.0, 0.0 );
-	specularColor = half3( 0.0, 1.0, 0.0 );
+	diffuseColor = float3( 0.0, 0.0, 0.0 );
+	specularColor = float3( 0.0, 1.0, 0.0 );
 #endif
 
 	float3 kS = Fresnel_SchlickRoughness( specularColor, vDotN, roughness );
 	float3 kD = ( float3( 1.0, 1.0, 1.0 ) - kS ) * ( 1.0 - metallic );
 
 #else
+
+	float ao = 1.0;
+
+#if KENNY_PBR
+	float3 diffuseColor = diffuseMap;
+	float3 specularColor;
+	float roughness;
+
+	PBRFromSpecmap( specMapSRGB.rgb, specularColor, roughness );
+#else
 	const float roughness = EstimateLegacyRoughness( specMapSRGB.rgb );
 
-	half3 diffuseColor = diffuseMap;
-	half3 specularColor = specMap.rgb;
+	float3 diffuseColor = diffuseMap;
+	float3 specularColor = specMap.rgb;
+#endif
 
 #if defined( DEBUG_PBR )
-	diffuseColor = half3( 0.0, 0.0, 0.0 );
-	specularColor = half3( 1.0, 0.0, 0.0 );
+	diffuseColor = float3( 0.0, 0.0, 0.0 );
+	specularColor = float3( 1.0, 0.0, 0.0 );
 #endif
 
 	float3 kS = Fresnel_SchlickRoughness( specularColor, vDotN, roughness );
@@ -249,17 +218,14 @@ void main( PS_IN fragment, out PS_OUT result )
 
 #endif
 
-	//diffuseColor = half3( 1.0, 1.0, 1.0 );
-	//diffuseColor = half3( 0.0, 0.0, 0.0 );
+	//diffuseColor = float3( 1.0, 1.0, 1.0 );
+	//diffuseColor = float3( 0.0, 0.0, 0.0 );
 
 	// calculate the screen texcoord in the 0.0 to 1.0 range
 	//float2 screenTexCoord = vposToScreenPosTexCoord( fragment.position.xy );
 	float2 screenTexCoord = fragment.position.xy * rpWindowCoord.xy;
 
-	float ao = 1.0;
-	ao = t_Ssao.Sample( s_LinearClamp, screenTexCoord ).r;
-
-	//diffuseColor.rgb *= ao;
+	ao = min( ao,  t_Ssao.Sample( s_LinearClamp, screenTexCoord ).r );
 
 	// evaluate diffuse IBL
 
@@ -295,16 +261,14 @@ void main( PS_IN fragment, out PS_OUT result )
 	float specAO = ComputeSpecularAO( vDotN, ao, roughness );
 	float3 specularLight = radiance * ( kS * envBRDF.x + envBRDF.y ) * specAO * ( rpSpecularModifier.xyz * 1.0 );
 
-#if 1
 	// Marmoset Horizon Fade trick
 	const half horizonFade = 1.3;
 	half horiz = saturate( 1.0 + horizonFade * saturate( dot3( reflectionVector, globalNormal ) ) );
 	horiz *= horiz;
 	//horiz = clamp( horiz, 0.0, 1.0 );
-#endif
 
-	//half3 lightColor = sRGBToLinearRGB( rpAmbientColor.rgb );
-	half3 lightColor = ( rpAmbientColor.rgb );
+	//float3 lightColor = sRGBToLinearRGB( rpAmbientColor.rgb );
+	float3 lightColor = ( rpAmbientColor.rgb );
 
 	//result.color.rgb = diffuseLight;
 	//result.color.rgb = diffuseLight * lightColor;

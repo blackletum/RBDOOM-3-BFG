@@ -36,6 +36,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "../simplex.h"	// line font definition
 #include "../ImmediateMode.h"
 
+#include <sys/DeviceManager.h>
+extern DeviceManager* deviceManager;
+
 idCVar r_showCenterOfProjection( "r_showCenterOfProjection", "0", CVAR_RENDERER | CVAR_BOOL, "Draw a cross to show the center of projection" );
 idCVar r_showLines( "r_showLines", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = draw alternate horizontal lines, 2 = draw alternate vertical lines" );
 
@@ -92,7 +95,7 @@ void idRenderBackend::DBG_SimpleSurfaceSetup( const drawSurf_t* drawSurf )
 	if( !currentScissor.Equals( drawSurf->scissorRect ) && r_useScissor.GetBool() )
 	{
 		GL_Scissor( viewDef->viewport.x1 + drawSurf->scissorRect.x1,
-					viewDef->viewport.y1 + drawSurf->scissorRect.y1,
+					viewDef->viewport.y2 - drawSurf->scissorRect.y2,
 					drawSurf->scissorRect.x2 + 1 - drawSurf->scissorRect.x1,
 					drawSurf->scissorRect.y2 + 1 - drawSurf->scissorRect.y1 );
 
@@ -113,8 +116,9 @@ void idRenderBackend::DBG_SimpleWorldSetup()
 	RB_SetMVP( viewDef->worldSpace.mvp );
 	// RB end
 
+	// RB: (0, 0) starts in the upper left corner compared to OpenGL!
 	GL_Scissor( viewDef->viewport.x1 + viewDef->scissor.x1,
-				viewDef->viewport.y1 + viewDef->scissor.y1,
+				viewDef->viewport.y2 - viewDef->scissor.y2,
 				viewDef->scissor.x2 + 1 - viewDef->scissor.x1,
 				viewDef->scissor.y2 + 1 - viewDef->scissor.y1 );
 
@@ -384,6 +388,11 @@ void idRenderBackend::DBG_RenderDrawSurfListWithFunction( drawSurf_t** drawSurfs
 
 			RB_SetMVP( drawSurf->space->mvp );
 		}
+
+		// give every surface a different color
+		//static idVec4 colors[] = { colorRed, colorGreen, colorBlue, colorYellow, colorMagenta, colorCyan, colorWhite, colorPurple };
+		//GL_Color( colors[i & 7] );
+		//GL_Color( colors[drawSurf->ambientCache & 7] );
 #else
 
 		if( drawSurf->space != NULL )  	// is it ever NULL?  Do we need to check?
@@ -419,10 +428,12 @@ void idRenderBackend::DBG_RenderDrawSurfListWithFunction( drawSurf_t** drawSurfs
 
 		if( drawSurf->jointCache )
 		{
+			GL_Color( colorRed );
 			renderProgManager.BindShader_ColorSkinned();
 		}
 		else
 		{
+			GL_Color( colorCyan );
 			renderProgManager.BindShader_Color();
 		}
 		// RB end
@@ -433,7 +444,7 @@ void idRenderBackend::DBG_RenderDrawSurfListWithFunction( drawSurf_t** drawSurfs
 			currentScissor = drawSurf->scissorRect;
 
 			GL_Scissor( viewDef->viewport.x1 + currentScissor.x1,
-						viewDef->viewport.y1 + currentScissor.y1,
+						viewDef->viewport.y2 - currentScissor.y2,
 						currentScissor.x2 + 1 - currentScissor.x1,
 						currentScissor.y2 + 1 - currentScissor.y1 );
 		}
@@ -1167,8 +1178,12 @@ void idRenderBackend::DBG_ShowViewEnvprobes()
 		float denom = idWinding::TriangleArea( verts[0], verts[1], verts[2] );
 		if( denom == 0 )
 		{
-			// all points at same location
-			barycentricWeights.Set( 1, 0, 0 );
+			// triangle is line
+			float t;
+
+			R_ClosestPointOnLineSegment( testOrigin, verts[0], verts[1], t );
+
+			barycentricWeights.Set( 1.0f - t, t, 0 );
 		}
 		else
 		{
@@ -2314,6 +2329,7 @@ void idRenderBackend::DBG_TestImage()
 
 	// Set State
 	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO | GLS_DEPTHMASK | GLS_DEPTHFUNC_ALWAYS | GLS_CULL_TWOSIDED );
+	renderProgManager.SetRenderParm( RENDERPARM_ALPHA_TEST, vec4_zero.ToFloatPtr() );
 
 	// Set Parms
 	float texS[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
@@ -2323,6 +2339,7 @@ void idRenderBackend::DBG_TestImage()
 
 	float texGenEnabled[4] = { 0, 0, 0, 0 };
 	renderProgManager.SetRenderParm( RENDERPARM_TEXGEN_0_ENABLED, texGenEnabled );
+	RB_SetVertexColorParms( SVC_IGNORE );
 
 #if 1
 	// not really necessary but just for clarity
@@ -2374,16 +2391,31 @@ void idRenderBackend::DBG_TestImage()
 
 		GL_SelectTexture( 2 );
 		imageCb->Bind();
-		// SRS - Use Bink shader without sRGB to linear conversion, otherwise cinematic colours may be wrong
-		// BindShader_BinkGUI() does not seem to work here - perhaps due to vertex shader input dependencies?
-		renderProgManager.BindShader_Bink_sRGB();
+
+		// SRS - When rendering in 2D skip sRGB to linear conversion
+		if( viewDef->viewEntitys )
+		{
+			renderProgManager.BindShader_Bink();
+		}
+		else
+		{
+			renderProgManager.BindShader_Bink_sRGB();
+		}
 	}
 	else
 	{
 		GL_SelectTexture( 0 );
 		image->Bind();
 
-		renderProgManager.BindShader_Texture();
+		// SRS - When rendering in 2D skip sRGB to linear conversion
+		if( viewDef->viewEntitys )
+		{
+			renderProgManager.BindShader_TextureVertexColor();
+		}
+		else
+		{
+			renderProgManager.BindShader_TextureVertexColor_sRGB();
+		}
 	}
 
 	// Draw!
@@ -2431,6 +2463,14 @@ void idRenderBackend::DBG_RenderDebugTools( drawSurf_t** drawSurfs, int numDrawS
 		return;
 	}
 
+	nvrhi::ObjectType commandObject = nvrhi::ObjectTypes::D3D12_GraphicsCommandList;
+	if( deviceManager->GetGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN )
+	{
+		commandObject = nvrhi::ObjectTypes::VK_CommandBuffer;
+	}
+	OPTICK_GPU_CONTEXT( ( void* ) commandList->getNativeObject( commandObject ) );
+	OPTICK_GPU_EVENT( "Render_DebugTools" );
+
 	// don't do much if this was a 2D rendering
 	if( !viewDef->viewEntitys )
 	{
@@ -2439,7 +2479,7 @@ void idRenderBackend::DBG_RenderDebugTools( drawSurf_t** drawSurfs, int numDrawS
 		return;
 	}
 
-	OPTICK_EVENT( "Render_DebugTools" );
+	//OPTICK_EVENT( "Render_DebugTools" );
 
 	renderLog.OpenMainBlock( MRB_DRAW_DEBUG_TOOLS );
 	renderLog.OpenBlock( "Render_DebugTools", colorGreen );

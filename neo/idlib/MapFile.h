@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2015-2021 Robert Beckebans
+Copyright (C) 2015-2023 Robert Beckebans
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -182,11 +182,18 @@ public:
 	{
 		sides.DeleteContents( true );
 	}
-	static idMapBrush* 		Parse( idLexer& src, const idVec3& origin, bool newFormat = true, float version = CURRENT_MAP_VERSION );
+	static idMapBrush* 		Parse( idLexer& src, const idVec3& origin, bool newFormat = true, int version = CURRENT_MAP_VERSION );
 	static idMapBrush* 		ParseQ3( idLexer& src, const idVec3& origin );
 	static idMapBrush* 		ParseValve220( idLexer& src, const idVec3& origin ); // RB
 	bool					Write( idFile* fp, int primitiveNum, const idVec3& origin ) const;
 	bool					WriteValve220( idFile* fp, int primitiveNum, const idVec3& origin ) const; // RB
+
+	// returns an origin brush with the size of (2, 2, 2) by default
+	// so we can center the brush on a grid size of 1 in TrenchBroom
+	static idMapBrush*		MakeOriginBrush( const idVec3& origin, const idVec3& scale = vec3_one );
+
+	void					SetPlanePointsFromWindings( const idVec3& origin, int entityNum, int primitiveNum );
+
 	int						GetNumSides() const
 	{
 		return sides.Num();
@@ -215,7 +222,7 @@ public:
 	idMapPatch();
 	idMapPatch( int maxPatchWidth, int maxPatchHeight );
 	~idMapPatch() { }
-	static idMapPatch* 		Parse( idLexer& src, const idVec3& origin, bool patchDef3 = true, float version = CURRENT_MAP_VERSION );
+	static idMapPatch* 		Parse( idLexer& src, const idVec3& origin, bool patchDef3, int version );
 	bool					Write( idFile* fp, int primitiveNum, const idVec3& origin ) const;
 	const char* 			GetMaterial() const
 	{
@@ -448,7 +455,7 @@ public:
 	}
 	// HVG check gltf scene for entities
 	static int				GetEntities( gltfData* data, EntityListRef entities, int scene = 0 );
-	static idMapEntity* 	Parse( idLexer& src, bool worldSpawn = false, float version = CURRENT_MAP_VERSION );
+	static idMapEntity* 	Parse( idLexer& src, bool worldSpawn = false, int version = CURRENT_MAP_VERSION );
 	bool					Write( idFile* fp, int entityNum, bool valve220 ) const;
 
 	// HVG NOTE: this is not compatible with gltf (extra) json!
@@ -491,16 +498,20 @@ public:
 	// normally this will use a .reg file instead of a .map file if it exists,
 	// which is what the game and dmap want, but the editor will want to always
 	// load a .map file
-	bool					Parse( const char* filename, bool ignoreRegion = false, bool osPath = false );
+	bool					Parse( const char* filename, bool ignoreRegion = false, bool osPath = false, bool ignoreExtraEnts = false );
 	bool					Write( const char* fileName, const char* ext, bool fromBasePath = true );
 
 	// RB begin
 	bool					WriteJSON( const char* fileName, const char* ext, bool fromBasePath = true );
+	bool					WriteDiff( const idMapFile* other, const char* fileName, const char* ext, bool fromBasePath = true );
 	bool					ConvertToPolygonMeshFormat();
-	bool					ConvertToValve220Format();
+	bool					ConvertToValve220Format( bool recalcPlanePoints );
+
+	void					ClassifyEntitiesForTrenchBroom( idDict& classTypeOverview );
 
 	// converts Wad texture names to valid Doom 3 materials and gives every entity a unique name
 	bool					ConvertQuakeToDoom();
+	void					FixDuplicatedNamesInGroupInstances();
 	// RB end
 
 	// get the number of entities in the map
@@ -544,17 +555,23 @@ public:
 		return hasPrimitiveData;
 	}
 
+	bool					IsGLTF() const
+	{
+		return gltfFormat;
+	}
+
 	static void				AddMaterialToCollection( const char* material, idStrList& textureCollections );
 	static void				WadTextureToMaterial( const char* material, idStr& matName );
 
 protected:
-	float					version;
+	int						version;
 	ID_TIME_T					fileTime;
 	unsigned int			geometryCRC;
 	idMapEntity::EntityList	entities;
 	idStr					name;
 	bool					hasPrimitiveData;
-	bool					valve220Format; // RB: for TrenchBroom support
+	bool					valve220Format;	// RB: for TrenchBroom support
+	bool					gltfFormat;
 
 private:
 	void					SetGeometryCRC();
@@ -569,6 +586,7 @@ ID_INLINE idMapFile::idMapFile()
 	entities.Resize( 1024, 256 );
 	hasPrimitiveData = false;
 	valve220Format = false;
+	gltfFormat = false;
 }
 
 #endif /* !__MAPFILE_H__ */

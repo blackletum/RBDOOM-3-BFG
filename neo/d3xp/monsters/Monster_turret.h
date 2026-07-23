@@ -41,10 +41,10 @@ private:
 	stateResult_t				combat_attack( stateParms_t* parms );
 	stateResult_t				state_Disabled( stateParms_t* parms );
 
-	boolean		fire;
-	boolean		attack_monsters;
+	bool		fire;
+	bool		attack_monsters;
 	idEntity	light;
-	boolean		light_is_on;
+	bool		light_is_on;
 	float		attackTime;
 
 	int			barrelCount;

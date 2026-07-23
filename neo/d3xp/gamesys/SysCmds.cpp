@@ -1458,7 +1458,7 @@ static void PrintFloat( float f )
 	char buf[128];
 	int i;
 
-	for( i = sprintf( buf, "%3.2f", f ); i < 7; i++ )
+	for( i = idStr::snPrintf( buf, sizeof( buf ), "%3.2f", f ); i < 7; i++ )
 	{
 		buf[i] = ' ';
 	}
@@ -2761,6 +2761,9 @@ void Cmd_EditLights_f( const idCmdArgs& args )
 		r_singleLight.SetInteger( -1 );
 		r_showLights.SetInteger( 0 );
 	}
+
+	// put player into fly mode
+	Cmd_Noclip_f( args );
 }
 // RB end
 

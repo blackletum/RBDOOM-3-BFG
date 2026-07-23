@@ -102,7 +102,7 @@ void idSoundSample_XAudio2::WriteGeneratedSample( idFile* fileOut )
 	fileOut->WriteBig( loaded );
 	fileOut->WriteBig( playBegin );
 	fileOut->WriteBig( playLength );
-	idWaveFile::WriteWaveFormatDirect( format, fileOut );
+	idWaveFile::WriteWaveFormatDirect( format, fileOut, false );
 	fileOut->WriteBig( ( int )amplitude.Num() );
 	fileOut->Write( amplitude.Ptr(), amplitude.Num() );
 	fileOut->WriteBig( totalBufferSize );
@@ -200,6 +200,13 @@ void idSoundSample_XAudio2::LoadResource()
 		return;
 	}
 
+#if 0
+	if( idStr::FindText( GetName(), "marine1_sitting_1_1", 8 ) > -1 )
+	{
+		loaded = false;
+	}
+#endif
+
 	loaded = false;
 
 	for( int i = 0; i < 2; i++ )
@@ -223,8 +230,9 @@ void idSoundSample_XAudio2::LoadResource()
 			}
 			generatedName.Append( ".idwav" );
 		}
-		loaded = LoadGeneratedSample( generatedName ) || LoadWav( sampleName );
 
+		// try .wav and .ogg first
+		loaded = LoadWav( sampleName );
 		if( !loaded && s_useCompression.GetBool() )
 		{
 			sampleName.SetFileExtension( "wav" );
@@ -235,6 +243,11 @@ void idSoundSample_XAudio2::LoadResource()
 		{
 			sampleName.SetFileExtension( "ogg" );
 			loaded = LoadOgg( sampleName );
+		}
+
+		if( !loaded )
+		{
+			loaded = LoadGeneratedSample( generatedName );
 		}
 
 		if( loaded )
@@ -576,10 +589,18 @@ float idSoundSample_XAudio2::GetAmplitude( int timeMS ) const
 	{
 		return 0.0f;
 	}
+
 	if( IsDefault() )
 	{
 		return 1.0f;
 	}
+
+	// RB: don't have amplitudes for the original Doom 3 so return 1.0 to avoid many missing lights
+	if( fileSystem->IsDoom2004() )
+	{
+		return 1.0f;
+	}
+
 	int index = timeMS * 60 / 1000;
 	if( index < 0 || index >= amplitude.Num() )
 	{

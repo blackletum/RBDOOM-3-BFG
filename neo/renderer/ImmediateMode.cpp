@@ -147,13 +147,13 @@ void fhImmediateMode::End()
 
 	for( int i = 0; i < layouts->Num(); i++ )
 	{
-		if( !tr.backend.currentBindingSets[i] || *tr.backend.currentBindingSets[i]->getDesc() != tr.backend.pendingBindingSetDescs[bindingLayoutType][i] )
+		if( !tr.backend.currentBindingSets[i] || *tr.backend.currentBindingSets[i]->getDesc() != tr.backend.pendingBindingSetDescs[bindingLayoutType][i] || bindingLayoutType != tr.backend.prevBindingLayoutType )
 		{
 			tr.backend.currentBindingSets[i] = tr.backend.bindingCache.GetOrCreateBindingSet( tr.backend.pendingBindingSetDescs[bindingLayoutType][i], ( *layouts )[i] );
 		}
 	}
 
-	uint64_t stateBits = tr.backend.glStateBits;
+	uint64 stateBits = tr.backend.glStateBits;
 
 	int program = renderProgManager.CurrentProgram();
 	PipelineKey key{ stateBits, program, static_cast<int>( tr.backend.depthBias ), tr.backend.slopeScaleBias, tr.backend.currentFrameBuffer };

@@ -164,10 +164,6 @@ void Framebuffer::ResizeFramebuffers( bool reloadImages )
 			.addColorAttachment( globalImages->envprobeHDRImage->texture )
 			.setDepthAttachment( globalImages->envprobeDepthImage->texture ) );
 
-	globalFramebuffers.hdr64FBO = new Framebuffer( "_hdr64",
-			nvrhi::FramebufferDesc()
-			.addColorAttachment( globalImages->currentRenderHDRImage64->texture ) );
-
 	for( int i = 0; i < MAX_SSAO_BUFFERS; i++ )
 	{
 		globalFramebuffers.ambientOcclusionFBO[i] = new Framebuffer( va( "_aoRender%i", i ),
@@ -190,6 +186,10 @@ void Framebuffer::ResizeFramebuffers( bool reloadImages )
 			.addColorAttachment( globalImages->gbufferNormalsRoughnessImage->texture )
 			.setDepthAttachment( globalImages->currentDepthImage->texture ) );
 
+	globalFramebuffers.smaaInputFBO = new Framebuffer( "_smaaInput",
+			nvrhi::FramebufferDesc()
+			.addColorAttachment( globalImages->smaaInputImage->texture ) );
+
 	globalFramebuffers.smaaEdgesFBO = new Framebuffer( "_smaaEdges",
 			nvrhi::FramebufferDesc()
 			.addColorAttachment( globalImages->smaaEdgesImage->texture ) );
@@ -210,6 +210,10 @@ void Framebuffer::ResizeFramebuffers( bool reloadImages )
 			.addColorAttachment( globalImages->guiEdit->texture )
 			.setDepthAttachment( globalImages->guiEditDepthStencilImage->texture ) );
 
+	globalFramebuffers.accumFBO = new Framebuffer( "_accum",
+			nvrhi::FramebufferDesc()
+			.addColorAttachment( globalImages->accumImage->texture ) );
+
 	Framebuffer::Unbind();
 }
 
@@ -220,7 +224,6 @@ void Framebuffer::ReloadImages()
 	globalImages->currentRenderImage->Reload( false, tr.backend.commandList );
 	globalImages->currentDepthImage->Reload( false, tr.backend.commandList );
 	globalImages->currentRenderHDRImage->Reload( false, tr.backend.commandList );
-	globalImages->currentRenderHDRImage64->Reload( false, tr.backend.commandList );
 	for( int i = 0; i < MAX_SSAO_BUFFERS; i++ )
 	{
 		globalImages->ambientOcclusionImage[i]->Reload( false, tr.backend.commandList );
@@ -228,11 +231,14 @@ void Framebuffer::ReloadImages()
 	globalImages->hierarchicalZbufferImage->Reload( false, tr.backend.commandList );
 	globalImages->gbufferNormalsRoughnessImage->Reload( false, tr.backend.commandList );
 	globalImages->taaMotionVectorsImage->Reload( false, tr.backend.commandList );
-	globalImages->taaResolvedImage->Reload( false, tr.backend.commandList );
 	globalImages->taaFeedback1Image->Reload( false, tr.backend.commandList );
 	globalImages->taaFeedback2Image->Reload( false, tr.backend.commandList );
+	globalImages->taaResolvedImage->Reload( false, tr.backend.commandList );
+
+	globalImages->smaaInputImage->Reload( false, tr.backend.commandList );
 	globalImages->smaaEdgesImage->Reload( false, tr.backend.commandList );
 	globalImages->smaaBlendImage->Reload( false, tr.backend.commandList );
+
 	globalImages->shadowAtlasImage->Reload( false, tr.backend.commandList );
 	for( int i = 0; i < MAX_SHADOWMAP_RESOLUTIONS; i++ )
 	{
@@ -243,6 +249,7 @@ void Framebuffer::ReloadImages()
 		globalImages->bloomRenderImage[i]->Reload( false, tr.backend.commandList );
 	}
 	globalImages->guiEdit->Reload( false, tr.backend.commandList );
+	globalImages->accumImage->Reload( false, tr.backend.commandList );
 	tr.backend.commandList->close();
 	deviceManager->GetDevice()->executeCommandList( tr.backend.commandList );
 }

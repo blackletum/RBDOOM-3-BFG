@@ -39,27 +39,24 @@ If you have questions concerning this license or the applicable additional terms
 
 ===============================================================================
 */
-enum stereo3DMode_t
+
+
+// In a head mounted display with separate displays for each eye,
+// screen separation will be zero and world separation will be the eye distance.
+struct stereoDistances_t
 {
-	STEREO3D_OFF,
+	// Offset to projection matrix, positive one eye, negative the other.
+	// Total distance is twice this, so 0.05 would give a 10% of screen width
+	// separation for objects at infinity.
+	float	screenSeparation;
 
-	// half-resolution, non-square pixel views
-	STEREO3D_SIDE_BY_SIDE_COMPRESSED,
-	STEREO3D_TOP_AND_BOTTOM_COMPRESSED,
+	// Game world units from one eye to the centerline.
+	// Total distance is twice this.
+	float	worldSeparation;
 
-	// two full resolution views side by side, as for a dual cable display
-	STEREO3D_SIDE_BY_SIDE,
-
-	STEREO3D_INTERLACED,
-
-	// OpenGL quad buffer
-	STEREO3D_QUAD_BUFFER,
-
-	// two full resolution views stacked with a 30 pixel guard band
-	// On the PC this can be configured as a custom video timing, but
-	// it definitely isn't a consumer level task.  The quad_buffer
-	// support can handle 720P-3D with apropriate driver support.
-	STEREO3D_HDMI_720
+	// RB: offset behind both eyes considering the FOV
+	// see https://github.com/RobertBeckebans/RBDOOM-3-BFG/issues/878
+	float	combinedSeperation;
 };
 
 typedef enum
@@ -83,7 +80,14 @@ enum graphicsVendor_t
 	VENDOR_NVIDIA,
 	VENDOR_AMD,
 	VENDOR_INTEL,
-	VENDOR_APPLE                            // SRS - Added support for Apple GPUs
+	VENDOR_APPLE,					// SRS - Added support for Apple GPUs
+	VENDOR_OTHER
+};
+
+enum graphicsGpuType_t
+{
+	GPU_TYPE_DISCRETE,
+	GPU_TYPE_OTHER
 };
 
 #define ID_MSAA 0
@@ -91,6 +95,7 @@ enum graphicsVendor_t
 enum antiAliasingMode_t
 {
 	ANTI_ALIASING_NONE,
+	ANTI_ALIASING_SMAA_1X,
 	ANTI_ALIASING_TAA,
 
 #if ID_MSAA
@@ -126,6 +131,13 @@ struct performanceCounters_t
 	int		c_lightReferences;
 	int		c_guiSurfs;
 
+	int		c_mocVerts;
+	int		c_mocIndexes;
+	int		c_mocTests;
+	int		c_mocCulledSurfaces;
+	int		c_mocCulledLights;
+
+	uint64	mocMicroSec;
 	uint64	frontEndMicroSec;	// sum of time in all RE_RenderScene's in a frame
 };
 
@@ -149,15 +161,24 @@ struct backEndCounters_t
 
 	uint64	cpuTotalMicroSec;		// total microseconds for backend run
 	uint64	cpuShadowMicroSec;
+	uint64	gpuBeginDrawingMicroSec;
 	uint64	gpuDepthMicroSec;
+	uint64	gpuGeometryMicroSec;
 	uint64	gpuScreenSpaceAmbientOcclusionMicroSec;
 	uint64	gpuScreenSpaceReflectionsMicroSec;
 	uint64	gpuAmbientPassMicroSec;
 	uint64	gpuShadowAtlasPassMicroSec;
 	uint64	gpuInteractionsMicroSec;
 	uint64	gpuShaderPassMicroSec;
+	uint64	gpuFogAllLightsMicroSec;
+	uint64	gpuBloomMicroSec;
+	uint64	gpuShaderPassPostMicroSec;
+	uint64	gpuMotionVectorsMicroSec;
 	uint64	gpuTemporalAntiAliasingMicroSec;
+	uint64	gpuToneMapPassMicroSec;
 	uint64	gpuPostProcessingMicroSec;
+	uint64	gpuDrawGuiMicroSec;
+	uint64	gpuCrtPostProcessingMicroSec;
 	uint64	gpuMicroSec;
 };
 // RB end
@@ -167,6 +188,7 @@ struct backEndCounters_t
 struct glconfig_t
 {
 	graphicsVendor_t	vendor;
+	graphicsGpuType_t	gpuType;
 
 //	int					maxTextureSize;			// TODO
 //	int					maxTextureCoords;		// TODO
@@ -175,15 +197,12 @@ struct glconfig_t
 
 	bool				timerQueryAvailable;
 
-	stereo3DMode_t		stereo3Dmode;
 	int					nativeScreenWidth; // this is the native screen width resolution of the renderer
 	int					nativeScreenHeight; // this is the native screen height resolution of the renderer
 
 	int					displayFrequency;
 
 	int					isFullscreen;					// monitor number
-	bool				isStereoPixelFormat;
-	bool				stereoPixelFormatAvailable;
 	int					multisamples;
 
 	// Screen separation for stereoscopic rendering is set based on this.
@@ -239,6 +258,8 @@ public:
 	virtual bool			IsFullScreen() const = 0;
 	virtual int				GetWidth() const = 0;
 	virtual int				GetHeight() const = 0;
+	virtual int				GetNativeWidth() const = 0;
+	virtual int				GetNativeHeight() const = 0;
 	virtual int				GetVirtualWidth() const = 0;
 	virtual int				GetVirtualHeight() const = 0;
 
@@ -249,14 +270,6 @@ public:
 
 	// This is used to calculate stereoscopic screen offset for a given interocular distance.
 	virtual float			GetPhysicalScreenWidthInCentimeters() const = 0;
-
-	// GetWidth() / GetHeight() return the size of a single eye
-	// view, which may be replicated twice in a stereo display
-	virtual stereo3DMode_t	GetStereo3DMode() const = 0;
-	virtual bool			IsStereoScopicRenderingSupported() const = 0;
-	virtual stereo3DMode_t	GetStereoScopicRenderingMode() const = 0;
-	virtual void			EnableStereoScopicRendering( const stereo3DMode_t mode ) const = 0;
-	virtual bool			HasQuadBufferSupport() const = 0;
 
 	// allocate a renderWorld to be used for drawing
 	virtual idRenderWorld* 	AllocRenderWorld() = 0;
@@ -306,12 +319,7 @@ public:
 	virtual void				DrawBigChar( int x, int y, int ch ) = 0;
 	virtual void				DrawBigStringExt( int x, int y, const char* string, const idVec4& setColor, bool forceColor ) = 0;
 
-	// dump all 2D drawing so far this frame to the demo file
-	virtual void			WriteDemoPics() = 0;
-	virtual void			WriteEndFrame() = 0;
-
-	// draw the 2D pics that were saved out with the current demo frame
-	virtual void			DrawDemoPics() = 0;
+	virtual void			DrawCRTPostFX() = 0; // RB
 
 	// Performs final closeout of any gui models being defined.
 	//
@@ -359,9 +367,6 @@ public:
 	virtual void			CropRenderSize( int width, int height ) = 0;
 	virtual void            CropRenderSize( int x, int y, int width, int height, bool topLeftAncor ) = 0;
 	virtual void			CaptureRenderToImage( const char* imageName, bool clearColorAfterCopy = false ) = 0;
-	// fixAlpha will set all the alpha channel values to 0xff, which allows screen captures
-	// to use the default tga loading code without having dimmed down areas in many places
-	virtual void			CaptureRenderToFile( const char* fileName, bool fixAlpha = false ) = 0;
 	virtual void			UnCrop() = 0;
 
 	// the image has to be already loaded ( most straightforward way would be through a FindMaterial )
